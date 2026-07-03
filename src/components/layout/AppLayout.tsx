@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { PERMISSIONS } from '@/constants/permissions';
 import { useTenantOrganization } from '@/hooks/api/useTenant';
-import { resolveNavLabel, type OrgSidebarLabels } from '@/lib/sidebarLabels';
+import { resolveNavLabel } from '@/lib/sidebarLabels';
 import { AiChatWidget } from '@/components/dashboard/AiChatWidget';
 
 const SIDEBAR_KEY = 'tm_sidebar_collapsed';
