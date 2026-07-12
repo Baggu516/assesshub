@@ -8,7 +8,7 @@ import { useTenantOrganization } from '@/hooks/api/useTenant';
 import { resolveNavLabel } from '@/lib/sidebarLabels';
 import { AiChatWidget } from '@/components/dashboard/AiChatWidget';
 
-const SIDEBAR_KEY = 'tm_sidebar_collapsed';
+const SIDEBAR_KEY = 'ah_sidebar_collapsed';
 
 function can(p: string[], k: (typeof PERMISSIONS)[keyof typeof PERMISSIONS]) {
   return p.includes(k);
@@ -39,6 +39,12 @@ function NavIcon({ to }: { to: string }) {
       return (
         <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
+      );
+    case '/classes':
+      return (
+        <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
         </svg>
       );
     case '/profile':
@@ -136,9 +142,21 @@ export function AppLayout() {
         show: !!user && can(user.permissions, PERMISSIONS.SUBORDINATE_CREATE),
       },
       {
+        to: '/classes',
+        label: resolveNavLabel('/classes', user?.hierarchyRole, sidebarLabels),
+        show:
+          !!user &&
+          user.hierarchyRole === 'admin' &&
+          (can(user.permissions, PERMISSIONS.CLASS_MANAGE) ||
+            can(user.permissions, PERMISSIONS.SETTINGS_MANAGE)),
+      },
+      {
         to: '/users',
         label: resolveNavLabel('/users', user?.hierarchyRole, sidebarLabels),
-        show: !!user && isTeacher && can(user.permissions, PERMISSIONS.USER_CREATE),
+        show:
+          !!user &&
+          (user.hierarchyRole === 'admin' || isTeacher) &&
+          can(user.permissions, PERMISSIONS.USER_CREATE),
       },
       {
         to: '/group-students',

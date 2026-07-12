@@ -34,12 +34,7 @@ export function PlatformLoginPage() {
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">Platform admin</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Use an account from <strong className="font-medium text-slate-700 dark:text-slate-300">Platform → Users</strong>{' '}
-            (registry), or env-based{' '}
-            <code className="text-xs">PLATFORM_ADMIN_EMAIL</code> /{' '}
-            <code className="text-xs">PLATFORM_ADMIN_PASSWORD</code> (or bcrypt hash).
-          </p>
+          <p className="mt-1 text-sm text-slate-500">Sign in with your platform credentials</p>
         </div>
         <Card>
           <form onSubmit={onSubmit} className="space-y-4">

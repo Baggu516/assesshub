@@ -16,6 +16,7 @@ export function SettingsPage() {
   const [navDashboard, setNavDashboard] = useState('');
   const [navAssessments, setNavAssessments] = useState('');
   const [navSubordinates, setNavSubordinates] = useState('');
+  const [navClasses, setNavClasses] = useState('');
   const [navUsers, setNavUsers] = useState('');
   const [navUsersMember, setNavUsersMember] = useState('');
   const [navProfile, setNavProfile] = useState('');
@@ -28,6 +29,7 @@ export function SettingsPage() {
       setNavDashboard(sl?.dashboard ?? '');
       setNavAssessments(sl?.assessments ?? '');
       setNavSubordinates(sl?.subordinates ?? '');
+      setNavClasses(sl?.classes ?? '');
       setNavUsers(sl?.users ?? '');
       setNavUsersMember(sl?.usersMember ?? '');
       setNavProfile(sl?.profile ?? '');
@@ -44,6 +46,7 @@ export function SettingsPage() {
             dashboard: navDashboard.trim(),
             assessments: navAssessments.trim(),
             subordinates: navSubordinates.trim(),
+            classes: navClasses.trim(),
             users: navUsers.trim(),
             usersMember: navUsersMember.trim(),
             profile: navProfile.trim(),
@@ -111,6 +114,16 @@ export function SettingsPage() {
                   placeholder="Teachers"
                   value={navSubordinates}
                   onChange={(e) => setNavSubordinates(e.target.value)}
+                  maxLength={48}
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Classes</span>
+                <input
+                  className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2"
+                  placeholder="Classes"
+                  value={navClasses}
+                  onChange={(e) => setNavClasses(e.target.value)}
                   maxLength={48}
                 />
               </label>

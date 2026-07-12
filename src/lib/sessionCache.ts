@@ -1,7 +1,7 @@
 import type { AuthUser } from '@/types/user';
 
-const USER_PREFIX = 'tm_session_user:';
-const TENANT_PREFIX = 'tm_session_tenant:';
+const USER_PREFIX = 'ah_session_user:';
+const TENANT_PREFIX = 'ah_session_tenant:';
 
 export type CachedTenantOrganization = {
   id: string;

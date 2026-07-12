@@ -486,13 +486,13 @@ export function UsersPage() {
     <div className="space-y-8 w-full">
       <div>
         <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">
-          {user?.hierarchyRole === 'admin' ? 'Users' : 'My team'}
+          {user?.hierarchyRole === 'admin' ? 'Students' : 'My students'}
         </h1>
         <p className="text-sm text-slate-500 mt-1">
           {user?.hierarchyRole === 'subordinate'
             ? 'Students you manage — only your direct reports are listed.'
             : user?.hierarchyRole === 'admin'
-              ? 'Team members only — not admins or subordinate leads (use Subordinates for leads). Create people and manage access.'
+              ? 'All students in this school. Create them here, then assign them to a class under Classes.'
               : 'Create people, send invitations, and manage access.'}
         </p>
       </div>
@@ -501,9 +501,11 @@ export function UsersPage() {
         <Card>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Team members</h2>
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Students</h2>
               <p className="text-xs text-slate-500 mt-1">
-                Add someone with a password, or send an email invitation only.
+                {user?.hierarchyRole === 'admin'
+                  ? 'Add a student with a password, or send an email invitation. Pick which teacher they report to.'
+                  : 'Add someone with a password, or send an email invitation only.'}
               </p>
             </div>
             <button
@@ -521,7 +523,7 @@ export function UsersPage() {
         <div className="flex gap-2 mb-4">
           <input
             className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm flex-1"
-            placeholder={user?.hierarchyRole === 'subordinate' ? 'Search your team' : 'Search users'}
+            placeholder="Search students"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />

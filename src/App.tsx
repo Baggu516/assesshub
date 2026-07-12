@@ -12,6 +12,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { KnowledgeBasePage } from './pages/KnowledgeBasePage';
 import { AssessmentsPage } from './pages/AssessmentsPage';
 import { GroupStudentsPage } from './pages/GroupStudentsPage';
+import { ClassesPage } from './pages/ClassesPage';
 import { MyAssessmentsPage } from './pages/MyAssessmentsPage';
 import { TakeAssessmentPage } from './pages/TakeAssessmentPage';
 import { OrganizationPage } from './pages/OrganizationPage';
@@ -76,7 +77,7 @@ export default function App() {
         <Route
           path="users"
           element={
-            <RequireHierarchy roles={['subordinate']}>
+            <RequireHierarchy roles={['admin', 'subordinate']}>
               <RequirePermission keys={[PERMISSIONS.USER_CREATE]}>
                 <UsersPage />
               </RequirePermission>
@@ -109,6 +110,16 @@ export default function App() {
           }
         />
         <Route path="knowledge-base" element={<KnowledgeBasePage />} />
+        <Route
+          path="classes"
+          element={
+            <RequireHierarchy roles={['admin']}>
+              <RequirePermission keys={[PERMISSIONS.CLASS_MANAGE, PERMISSIONS.SETTINGS_MANAGE]}>
+                <ClassesPage />
+              </RequirePermission>
+            </RequireHierarchy>
+          }
+        />
         <Route
           path="group-students"
           element={

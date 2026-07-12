@@ -4,8 +4,8 @@ import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 import { Card, Select } from '@/components/ui';
 
-const PROVIDER_STORAGE_KEY = 'tm_dashboard_ai_provider';
-const ACTIVE_CHAT_STORAGE_KEY = 'tm_dashboard_ai_chat_id';
+const PROVIDER_STORAGE_KEY = 'ah_dashboard_ai_provider';
+const ACTIVE_CHAT_STORAGE_KEY = 'ah_dashboard_ai_chat_id';
 
 type Provider = 'gemini' | 'groq';
 

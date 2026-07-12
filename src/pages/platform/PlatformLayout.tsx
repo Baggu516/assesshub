@@ -4,7 +4,7 @@ import clsx from 'clsx';
 import { clearPlatformSession } from '@/lib/platformApi';
 import { useTheme } from '@/context/ThemeContext';
 
-const SIDEBAR_KEY = 'tm_platform_sidebar_collapsed';
+const SIDEBAR_KEY = 'ah_platform_sidebar_collapsed';
 
 function NavIcon({ to }: { to: string }) {
   const cls = 'h-5 w-5 shrink-0';

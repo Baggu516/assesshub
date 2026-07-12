@@ -2,8 +2,8 @@ import axios, { type AxiosError } from 'axios';
 import { queryClient } from './queryClient';
 import { clearSessionCache } from './sessionCache';
 
-const ACCESS = 'tm_access_token';
-const REFRESH = 'tm_refresh_token';
+const ACCESS = 'ah_access_token';
+const REFRESH = 'ah_refresh_token';
 
 /** Use Vite proxy `/api` by default. */
 const baseURL = import.meta.env.VITE_API_BASE_URL || '/api';
@@ -38,7 +38,7 @@ export function clearTokens() {
   localStorage.removeItem(REFRESH);
 }
 
-const TENANT_KEY = 'tm_tenant_subdomain';
+const TENANT_KEY = 'ah_tenant_subdomain';
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem(ACCESS);

@@ -16,6 +16,7 @@ export type OrgSidebarLabels = {
   assessments?: string;
   myAssessments?: string;
   groupStudents?: string;
+  classes?: string;
 };
 
 const FALLBACK = {
@@ -30,6 +31,7 @@ const FALLBACK = {
   assessments: 'Assessments',
   myAssessments: 'My assessments',
   groupStudents: 'Group students',
+  classes: 'Classes',
 } as const;
 
 export function resolveNavLabel(
@@ -62,6 +64,8 @@ export function resolveNavLabel(
       return t(sl.myAssessments, FALLBACK.myAssessments);
     case '/group-students':
       return t(sl.groupStudents, FALLBACK.groupStudents);
+    case '/classes':
+      return t(sl.classes, FALLBACK.classes);
     default:
       return path;
   }

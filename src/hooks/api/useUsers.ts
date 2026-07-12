@@ -13,7 +13,12 @@ export interface UserListRow {
 }
 
 /** Cannot be granted to org line members by a lead (must match backend `ORG_LEVEL_PERMISSION_KEYS`). */
-export const ORG_LEVEL_KEYS = new Set(['user_create', 'subordinate_create', 'settings_manage']);
+export const ORG_LEVEL_KEYS = new Set([
+  'user_create',
+  'subordinate_create',
+  'settings_manage',
+  'class_manage',
+]);
 
 export function usePermissionsCatalogQuery() {
   return useQuery({

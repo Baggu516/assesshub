@@ -2,8 +2,8 @@ import axios, { type AxiosError } from 'axios';
 
 const baseURL = import.meta.env.VITE_API_BASE_URL || '/api';
 
-export const PLATFORM_KEY_STORAGE = 'tm_platform_api_key';
-export const PLATFORM_TOKEN_STORAGE = 'tm_platform_access_token';
+export const PLATFORM_KEY_STORAGE = 'ah_platform_api_key';
+export const PLATFORM_TOKEN_STORAGE = 'ah_platform_access_token';
 
 export function getPlatformToken() {
   return sessionStorage.getItem(PLATFORM_TOKEN_STORAGE);

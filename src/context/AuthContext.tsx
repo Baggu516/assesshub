@@ -31,15 +31,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const [user, setUser] = useState<AuthUser | null>(() => {
     if (typeof window === 'undefined') return null;
-    const token = localStorage.getItem('tm_access_token');
-    const sub = localStorage.getItem('tm_tenant_subdomain');
+    const token = localStorage.getItem('ah_access_token');
+    const sub = localStorage.getItem('ah_tenant_subdomain');
     if (!token || !sub) return null;
     return getCachedUser(sub);
   });
   const [loading, setLoading] = useState(() => {
     if (typeof window === 'undefined') return true;
-    const token = localStorage.getItem('tm_access_token');
-    const sub = localStorage.getItem('tm_tenant_subdomain');
+    const token = localStorage.getItem('ah_access_token');
+    const sub = localStorage.getItem('ah_tenant_subdomain');
     if (!token || !sub) return false;
     return !getCachedUser(sub);
   });
@@ -73,7 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const token = localStorage.getItem('tm_access_token');
+      const token = localStorage.getItem('ah_access_token');
       if (!token || !subdomain) {
         setLoading(false);
         return;
@@ -131,7 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const logout = useCallback(async () => {
-    const refresh = localStorage.getItem('tm_refresh_token');
+    const refresh = localStorage.getItem('ah_refresh_token');
     try {
       if (refresh) await api.post('/auth/logout', { refreshToken: refresh });
     } catch {

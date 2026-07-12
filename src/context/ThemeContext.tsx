@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 type Mode = 'light' | 'dark' | 'system';
 
-const KEY = 'tm_theme';
+const KEY = 'ah_theme';
 
 interface ThemeContextValue {
   mode: Mode;

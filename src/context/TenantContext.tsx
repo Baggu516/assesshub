@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
-const STORAGE_KEY = 'tm_tenant_subdomain';
+const STORAGE_KEY = 'ah_tenant_subdomain';
 
 interface TenantContextValue {
   subdomain: string;
@@ -11,7 +11,7 @@ const TenantContext = createContext<TenantContextValue | null>(null);
 
 function inferSubdomainFromHost(): string | null {
   const host = window.location.hostname.toLowerCase();
-  const base = (import.meta.env.VITE_BASE_DOMAIN || 'taskmanagement.com').toLowerCase();
+  const base = (import.meta.env.VITE_BASE_DOMAIN || 'assesshub.com').toLowerCase();
   if (host === 'localhost' || host === '127.0.0.1') return null;
   if (host.endsWith(`.${base}`) && host !== base) {
     return host.replace(`.${base}`, '').split('.')[0] || null;

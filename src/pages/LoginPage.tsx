@@ -44,7 +44,7 @@ export function LoginPage() {
               label="Organization subdomain"
               htmlFor="subdomain"
               required
-              hint={`Matches your URL: ${subdomain || 'acme'}.taskmanagement.com`}
+              hint={`Matches your URL: ${subdomain || 'acme'}.assesshub.com`}
             >
               <Input
                 id="subdomain"
