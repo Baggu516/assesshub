@@ -11,6 +11,8 @@ import {
   useClassMutations,
   type SchoolClass,
 } from '@/hooks/api/useClasses';
+import { useAcademicYearsQuery } from '@/hooks/api/useAcademicYears';
+import { useClassMastersQuery } from '@/hooks/api/useClassMasters';
 
 function MemberChecklist({
   title,
@@ -53,25 +55,34 @@ function MemberChecklist({
 
 function ClassFormModal({
   initial,
+  defaultYearId,
   onClose,
   onSave,
   saving,
 }: {
   initial?: SchoolClass | null;
+  defaultYearId?: string;
   onClose: () => void;
   onSave: (data: {
-    name: string;
+    academicYearId: string;
+    classMasterId: string;
+    section: string;
     description: string;
-    academicYear: string;
     teacherIds: string[];
     studentIds: string[];
   }) => void;
   saving: boolean;
 }) {
   const { data: options, isLoading } = useClassOptionsQuery();
-  const [name, setName] = useState(initial?.name || '');
+  const { data: years = [] } = useAcademicYearsQuery();
+  const { data: masters = [] } = useClassMastersQuery();
+
+  const [academicYearId, setAcademicYearId] = useState(
+    initial?.academicYearId || defaultYearId || ''
+  );
+  const [classMasterId, setClassMasterId] = useState(initial?.classMasterId || '');
+  const [section, setSection] = useState(initial?.section || '');
   const [description, setDescription] = useState(initial?.description || '');
-  const [academicYear, setAcademicYear] = useState(initial?.academicYear || '');
   const [teachers, setTeachers] = useState<Set<string>>(
     () => new Set((initial?.teachers || []).map((t) => t.id))
   );
@@ -88,15 +99,16 @@ function ClassFormModal({
     });
   };
 
-  const canSave = name.trim().length > 0;
+  const canSave = !!academicYearId && !!classMasterId;
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!canSave || saving) return;
     onSave({
-      name: name.trim(),
+      academicYearId,
+      classMasterId,
+      section: section.trim(),
       description: description.trim(),
-      academicYear: academicYear.trim(),
       teacherIds: [...teachers],
       studentIds: [...students],
     });
@@ -108,10 +120,10 @@ function ClassFormModal({
         <div className="flex items-start justify-between gap-2">
           <div>
             <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
-              {initial ? 'Edit class' : 'Create class'}
+              {initial ? 'Edit academic class' : 'Create academic class'}
             </h3>
             <p className="text-xs text-slate-500 mt-1">
-              Name the class, optionally assign teachers now. Students are optional — add them when they exist.
+              Pick a year, grade master, and section (e.g. Grade 5 + A → Grade 5 A for 2026-27).
             </p>
           </div>
           <button type="button" onClick={onClose} className="text-slate-500 hover:text-slate-800 text-sm">
@@ -120,17 +132,46 @@ function ClassFormModal({
         </div>
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          <label className="block text-xs text-slate-500 space-y-1">
+            <span>Academic year *</span>
+            <select
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-900"
+              value={academicYearId}
+              onChange={(e) => setAcademicYearId(e.target.value)}
+              required
+            >
+              <option value="">Select year…</option>
+              {years.map((y) => (
+                <option key={y.id} value={y.id}>
+                  {y.label}
+                  {y.isCurrent ? ' (current)' : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block text-xs text-slate-500 space-y-1">
+            <span>Class master *</span>
+            <select
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-900"
+              value={classMasterId}
+              onChange={(e) => setClassMasterId(e.target.value)}
+              required
+            >
+              <option value="">Select grade…</option>
+              {masters.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
           <input
-            placeholder="Class name * (e.g. Grade 8-A)"
+            placeholder="Section (e.g. A)"
             className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <input
-            placeholder="Academic year (e.g. 2025-26)"
-            className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm"
-            value={academicYear}
-            onChange={(e) => setAcademicYear(e.target.value)}
+            value={section}
+            onChange={(e) => setSection(e.target.value)}
           />
           <textarea
             placeholder="Description (optional)"
@@ -161,9 +202,7 @@ function ClassFormModal({
             />
           ) : (
             <p className="text-xs text-slate-500 rounded-lg border border-dashed border-slate-200 dark:border-slate-700 px-3 py-3">
-              No students yet — you can create the class now. Add students later from{' '}
-              <span className="font-medium text-slate-700 dark:text-slate-300">Students</span>, then edit
-              this class.
+              No students yet — create the class now and enroll students later.
             </p>
           )}
 
@@ -182,24 +221,29 @@ function ClassFormModal({
 }
 
 export function ClassesPage() {
-  const { data: classes = [], isLoading } = useClassesQuery();
+  const { data: years = [] } = useAcademicYearsQuery();
+  const currentYear = useMemo(
+    () => years.find((y) => y.isCurrent) || years[0] || null,
+    [years]
+  );
+  const [yearFilter, setYearFilter] = useState<string>('');
+  const effectiveYearId = yearFilter === 'all' ? null : yearFilter || currentYear?.id || null;
+
+  const { data: classes = [], isLoading } = useClassesQuery(true, effectiveYearId);
   const { create, update, remove } = useClassMutations();
   const [showForm, setShowForm] = useState(false);
   const [editTarget, setEditTarget] = useState<SchoolClass | null>(null);
 
   const sorted = useMemo(
-    () =>
-      [...classes].sort((a, b) => {
-        const y = (b.academicYear || '').localeCompare(a.academicYear || '');
-        return y !== 0 ? y : a.name.localeCompare(b.name);
-      }),
+    () => [...classes].sort((a, b) => a.name.localeCompare(b.name)),
     [classes]
   );
 
   const handleSave = async (form: {
-    name: string;
+    academicYearId: string;
+    classMasterId: string;
+    section: string;
     description: string;
-    academicYear: string;
     teacherIds: string[];
     studentIds: string[];
   }) => {
@@ -220,7 +264,7 @@ export function ClassesPage() {
   };
 
   const handleDelete = async (klass: SchoolClass) => {
-    if (!window.confirm(`Archive class "${klass.name}"? Teachers and students stay in the system.`)) return;
+    if (!window.confirm(`Archive class "${klass.name}"? Enrollments are ended; history is kept.`)) return;
     try {
       await remove.mutateAsync(klass.id);
       toast.success('Class archived');
@@ -233,19 +277,46 @@ export function ClassesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Classes"
-        description="Configure custom classes for your school. Students belong to the class — swap teachers when someone moves."
+        title="Academic classes"
+        description="A class is a grade + section for one academic year. Students enroll here — history is preserved across promotions."
         actions={
           <Button
             onClick={() => {
               setEditTarget(null);
               setShowForm(true);
             }}
+            disabled={!years.length}
           >
             New class
           </Button>
         }
       />
+
+      {!years.length ? (
+        <Card className="p-6 text-sm text-slate-500">
+          Create an academic year first under <span className="font-medium">Academic years</span>, then
+          add class masters, then open classes here.
+        </Card>
+      ) : (
+        <div className="flex flex-wrap gap-3 items-center">
+          <label className="text-xs text-slate-500 flex items-center gap-2">
+            Year
+            <select
+              className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-900"
+              value={yearFilter === 'all' ? 'all' : effectiveYearId || ''}
+              onChange={(e) => setYearFilter(e.target.value)}
+            >
+              <option value="all">All years</option>
+              {years.map((y) => (
+                <option key={y.id} value={y.id}>
+                  {y.label}
+                  {y.isCurrent ? ' (current)' : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="space-y-3">
@@ -254,7 +325,7 @@ export function ClassesPage() {
         </div>
       ) : sorted.length === 0 ? (
         <Card className="p-8 text-center text-sm text-slate-500">
-          No classes yet. Create a class, add students, then assign one or more teachers.
+          No academic classes for this year yet. Create one from a class master and section.
         </Card>
       ) : (
         <div className="space-y-3">
@@ -264,6 +335,7 @@ export function ClassesPage() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="font-medium text-slate-900 dark:text-white">{c.name}</h3>
                   {c.academicYear ? <Badge tone="neutral">{c.academicYear}</Badge> : null}
+                  {c.section ? <Badge tone="neutral">Sec {c.section}</Badge> : null}
                   <Badge tone="info">
                     {c.teacherCount} teacher{c.teacherCount !== 1 ? 's' : ''}
                   </Badge>
@@ -308,6 +380,7 @@ export function ClassesPage() {
         <ClassFormModal
           key={editTarget?.id || 'new'}
           initial={editTarget}
+          defaultYearId={effectiveYearId || undefined}
           onClose={() => {
             setShowForm(false);
             setEditTarget(null);

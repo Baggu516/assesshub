@@ -2,8 +2,14 @@ import { useMemo, useState, type Dispatch, type FormEvent, type SetStateAction }
 import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
 import type { AuthUser } from '@/types/user';
-import { Card } from '@/components/ui/Card';
-import { Skeleton } from '@/components/ui/Spinner';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { FormField } from '@/components/ui/FormField';
+import { Input } from '@/components/ui/Input';
+import { Modal } from '@/components/ui/Modal';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Select } from '@/components/ui/Select';
 import { PERMISSIONS } from '@/constants/permissions';
 import { formatPermissionList } from '@/constants/permissionLabels';
 import {
@@ -25,6 +31,7 @@ type MemberForm = {
 };
 
 function AddTeamMemberModal({
+  open,
   member,
   setMember,
   isAdmin,
@@ -36,6 +43,7 @@ function AddTeamMemberModal({
   createPending,
   invitePending,
 }: {
+  open: boolean;
   member: MemberForm;
   setMember: Dispatch<SetStateAction<MemberForm>>;
   isAdmin: boolean;
@@ -63,100 +71,104 @@ function AddTeamMemberModal({
     return isValidEmail(member.email) && (!isAdmin || Boolean(member.parentUserId));
   }, [member.email, member.parentUserId, isAdmin, subsLoading]);
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" role="dialog">
-      <Card className="max-w-lg w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Add student</h3>
-            <p className="text-xs text-slate-500 mt-1">
-              Fill all fields with a valid email; password min. 8 characters to create. Invite only needs a valid email
-              {isAdmin ? ' and parent lead.' : '.'}
-            </p>
-          </div>
-          <button type="button" onClick={onClose} className="text-slate-500 hover:text-slate-800 text-sm shrink-0">
-            Close
-          </button>
-        </div>
+  const busy = createPending || invitePending;
 
-        <div className="mt-4 space-y-3">
-          <input
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Add student"
+      description={
+        isAdmin
+          ? 'Create with a password, or send an email invite. Pick which teacher they report to.'
+          : 'Create with a password, or send an email invitation only.'
+      }
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
+          <Button variant="secondary" onClick={onInviteOnly} disabled={!canInviteOnly || busy}>
+            {invitePending ? 'Sending…' : 'Email invite'}
+          </Button>
+          <Button onClick={onCreateUser} disabled={!canCreateUser || busy}>
+            {createPending ? 'Creating…' : 'Create student'}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <FormField label="Email" htmlFor="add-student-email" required>
+          <Input
+            id="add-student-email"
             type="email"
-            placeholder="Email *"
             inputMode="email"
             autoComplete="email"
-            className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm"
+            placeholder="name@school.edu"
             value={member.email}
             onChange={(e) => setMember((m) => ({ ...m, email: e.target.value }))}
           />
-          <input
+        </FormField>
+        <FormField
+          label="Password"
+          htmlFor="add-student-password"
+          required
+          hint="Required to create an account · at least 8 characters"
+        >
+          <Input
+            id="add-student-password"
             type="password"
-            placeholder="Password * (min 8 characters — Create user)"
-            className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm"
+            autoComplete="new-password"
+            placeholder="••••••••"
             value={member.password}
             onChange={(e) => setMember((m) => ({ ...m, password: e.target.value }))}
-            autoComplete="new-password"
           />
-          {isAdmin && (
-            <div>
-              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                Subordinate lead (parent) *
-              </label>
-              <select
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm"
-                value={member.parentUserId}
-                onChange={(e) => setMember((m) => ({ ...m, parentUserId: e.target.value }))}
-                required={isAdmin}
-                disabled={subsLoading}
-              >
-                <option value="">{subsLoading ? 'Loading leads…' : 'Select subordinate lead (parent)'}</option>
-                {subs.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.email}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-          <div className="grid md:grid-cols-2 gap-3">
-            <input
-              placeholder="First name *"
-              className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm"
+        </FormField>
+        {isAdmin && (
+          <FormField label="Teacher (parent)" htmlFor="add-student-parent" required>
+            <Select
+              id="add-student-parent"
+              value={member.parentUserId}
+              onChange={(e) => setMember((m) => ({ ...m, parentUserId: e.target.value }))}
+              required
+              disabled={subsLoading}
+            >
+              <option value="">{subsLoading ? 'Loading teachers…' : 'Select teacher'}</option>
+              {subs.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.email}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+        )}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <FormField label="First name" htmlFor="add-student-first" required>
+            <Input
+              id="add-student-first"
+              autoComplete="given-name"
+              placeholder="Jordan"
               value={member.firstName}
               onChange={(e) => setMember((m) => ({ ...m, firstName: e.target.value }))}
             />
-            <input
-              placeholder="Last name *"
-              className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm"
+          </FormField>
+          <FormField label="Last name" htmlFor="add-student-last" required>
+            <Input
+              id="add-student-last"
+              autoComplete="family-name"
+              placeholder="Lee"
               value={member.lastName}
               onChange={(e) => setMember((m) => ({ ...m, lastName: e.target.value }))}
             />
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onCreateUser}
-              disabled={!canCreateUser || createPending || invitePending}
-              className="rounded-lg bg-indigo-600 text-white text-sm px-4 py-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {createPending ? 'Creating…' : 'Create user'}
-            </button>
-            <button
-              type="button"
-              onClick={onInviteOnly}
-              disabled={!canInviteOnly || createPending || invitePending}
-              className="rounded-lg border border-slate-200 dark:border-slate-700 text-sm px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {invitePending ? 'Sending…' : 'Email invite only'}
-            </button>
-          </div>
+          </FormField>
         </div>
-      </Card>
-    </div>
+      </div>
+    </Modal>
   );
 }
 
 function EditUserModal({
+  open,
   target,
   viewer,
   subs,
@@ -167,6 +179,7 @@ function EditUserModal({
   onSave,
   saving,
 }: {
+  open: boolean;
   target: UserListRow;
   viewer: AuthUser;
   subs: { id: string; email: string }[];
@@ -215,130 +228,121 @@ function EditUserModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" role="dialog">
-      <Card className="max-w-lg w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Edit user</h3>
-            <p className="text-xs text-slate-500 mt-1 capitalize">{target.hierarchyRole}</p>
-          </div>
-          <button type="button" onClick={onClose} className="text-slate-500 hover:text-slate-800 text-sm">
-            Close
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-          <div className="space-y-3">
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400">Email</label>
-            <input
-              required
-              type="email"
-              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="off"
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Edit student"
+      description="Update account details and permissions."
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="edit-student-form" disabled={saving}>
+            {saving ? 'Saving…' : 'Save changes'}
+          </Button>
+        </>
+      }
+    >
+      <form id="edit-student-form" onSubmit={handleSubmit} className="space-y-4">
+        <FormField label="Email" htmlFor="edit-student-email" required>
+          <Input
+            id="edit-student-email"
+            required
+            type="email"
+            autoComplete="off"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </FormField>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <FormField label="First name" htmlFor="edit-student-first">
+            <Input
+              id="edit-student-first"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
             />
-            <div className="grid md:grid-cols-2 gap-3">
-              <input
-                className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm"
-                placeholder="First name"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-              />
-              <input
-                className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm"
-                placeholder="Last name"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-              />
-            </div>
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-              Active account
-            </label>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                New password (optional)
-              </label>
-              <input
-                type="password"
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm"
-                placeholder="Leave blank to keep current password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                autoComplete="new-password"
-              />
-              <p className="text-xs text-slate-500 mt-1">Minimum 8 characters when set.</p>
-            </div>
-            {showParentSelect && (
-              <div>
-                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                  Reports to (subordinate lead)
-                </label>
-                <select
-                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm"
-                  value={parentUserId}
-                  onChange={(e) => setParentUserId(e.target.value)}
-                >
-                  <option value="">No parent</option>
-                  {subs.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.email}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
+          </FormField>
+          <FormField label="Last name" htmlFor="edit-student-last">
+            <Input
+              id="edit-student-last"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+            />
+          </FormField>
+        </div>
+        <label className="flex cursor-pointer items-center gap-2.5 text-sm font-medium text-slate-700 dark:text-slate-300">
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+            checked={isActive}
+            onChange={(e) => setIsActive(e.target.checked)}
+          />
+          Active account
+        </label>
+        <FormField
+          label="New password"
+          htmlFor="edit-student-password"
+          hint="Leave blank to keep the current password · min. 8 characters when set"
+        >
+          <Input
+            id="edit-student-password"
+            type="password"
+            autoComplete="new-password"
+            placeholder="••••••••"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+          />
+        </FormField>
+        {showParentSelect && (
+          <FormField label="Reports to (teacher)" htmlFor="edit-student-parent">
+            <Select
+              id="edit-student-parent"
+              value={parentUserId}
+              onChange={(e) => setParentUserId(e.target.value)}
+            >
+              <option value="">No parent</option>
+              {subs.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.email}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+        )}
 
-          {canEditPermissionsSection && catalog && catalog.length > 0 && (
-            <div className="border-t border-slate-200 dark:border-slate-800 pt-4">
-              <h4 className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-2">
-                Permissions
-              </h4>
-              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                {catalog
-                  .filter((p) => assignableKeys.has(p.key))
-                  .map((p) => (
-                    <label
-                      key={p.key}
-                      className="flex items-start gap-2 rounded-lg border border-slate-200 dark:border-slate-700 p-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selected.has(p.key)}
-                        onChange={() => toggle(p.key)}
-                        className="mt-0.5"
-                      />
-                      <span>
-                        <span className="text-sm font-medium text-slate-800 dark:text-slate-100">{p.label}</span>
-                        <span className="block text-xs text-slate-500 font-mono">{p.key}</span>
+        {canEditPermissionsSection && catalog && catalog.length > 0 && (
+          <div className="border-t border-slate-100 pt-4 dark:border-slate-800">
+            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Permissions
+            </h4>
+            <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
+              {catalog
+                .filter((p) => assignableKeys.has(p.key))
+                .map((p) => (
+                  <label
+                    key={p.key}
+                    className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-slate-200 p-2.5 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800/50"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selected.has(p.key)}
+                      onChange={() => toggle(p.key)}
+                      className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                    />
+                    <span>
+                      <span className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                        {p.label}
                       </span>
-                    </label>
-                  ))}
-              </div>
+                      <span className="block font-mono text-xs text-slate-500">{p.key}</span>
+                    </span>
+                  </label>
+                ))}
             </div>
-          )}
-
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border border-slate-200 dark:border-slate-600 px-3 py-2 text-sm"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="rounded-lg bg-indigo-600 text-white px-3 py-2 text-sm disabled:opacity-50"
-            >
-              {saving ? 'Saving…' : 'Save'}
-            </button>
           </div>
-        </form>
-      </Card>
-    </div>
+        )}
+      </form>
+    </Modal>
   );
 }
 
@@ -397,6 +401,14 @@ export function UsersPage() {
     () => (data?.users ?? []).filter((u) => u.hierarchyRole === 'user'),
     [data?.users]
   );
+
+  const pageTitle = user?.hierarchyRole === 'admin' ? 'Students' : 'My students';
+  const pageDescription =
+    user?.hierarchyRole === 'subordinate'
+      ? 'Students you manage — only your direct reports are listed.'
+      : user?.hierarchyRole === 'admin'
+        ? 'All students in this school. Create them here, then assign them to a class under Classes.'
+        : 'Create people, send invitations, and manage access.';
 
   const runCreateMember = async () => {
     const email = member.email.trim();
@@ -483,107 +495,10 @@ export function UsersPage() {
   };
 
   return (
-    <div className="space-y-8 w-full">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">
-          {user?.hierarchyRole === 'admin' ? 'Students' : 'My students'}
-        </h1>
-        <p className="text-sm text-slate-500 mt-1">
-          {user?.hierarchyRole === 'subordinate'
-            ? 'Students you manage — only your direct reports are listed.'
-            : user?.hierarchyRole === 'admin'
-              ? 'All students in this school. Create them here, then assign them to a class under Classes.'
-              : 'Create people, send invitations, and manage access.'}
-        </p>
-      </div>
-
-      {canManageListedUsers && (
-        <Card>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Students</h2>
-              <p className="text-xs text-slate-500 mt-1">
-                {user?.hierarchyRole === 'admin'
-                  ? 'Add a student with a password, or send an email invitation. Pick which teacher they report to.'
-                  : 'Add someone with a password, or send an email invitation only.'}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setAddModalOpen(true)}
-              className="rounded-lg bg-indigo-600 text-white px-4 py-2 text-sm font-medium"
-            >
-              Add
-            </button>
-          </div>
-        </Card>
-      )}
-
-      <Card>
-        <div className="flex gap-2 mb-4">
-          <input
-            className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm flex-1"
-            placeholder="Search students"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-slate-500 border-b border-slate-200 dark:border-slate-800">
-                <th className="py-2">Email</th>
-                <th className="py-2">Role</th>
-                <th className="py-2">Status</th>
-                <th className="py-2">Permissions</th>
-                {canManageListedUsers && <th className="py-2"> </th>}
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading &&
-                Array.from({ length: 4 }).map((_, i) => (
-                  <tr key={i}>
-                    <td colSpan={canManageListedUsers ? 5 : 4}>
-                      <Skeleton className="h-6 my-2" />
-                    </td>
-                  </tr>
-                ))}
-              {!isLoading && memberRows.length === 0 && (
-                <tr>
-                  <td colSpan={canManageListedUsers ? 5 : 4} className="py-6 text-center text-sm text-slate-500">
-                    No students yet.
-                  </td>
-                </tr>
-              )}
-              {!isLoading &&
-                memberRows.map((u: UserListRow) => (
-                  <tr key={u.id} className="border-b border-slate-100 dark:border-slate-800">
-                    <td className="py-2">{u.email}</td>
-                    <td className="py-2">Student</td>
-                    <td className="py-2">{u.isActive ? 'Active' : 'Disabled'}</td>
-                    <td className="py-2 text-xs text-slate-600 dark:text-slate-400">
-                      <span className="line-clamp-2">{formatPermissionList(u.permissions)}</span>
-                    </td>
-                    {canManageListedUsers && (
-                      <td className="py-2 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setEditTarget(u)}
-                          className="text-indigo-600 dark:text-indigo-400 text-xs font-medium hover:underline"
-                        >
-                          Edit
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      {addModalOpen && canManageListedUsers && user && (
+    <div className="ah-page">
+      {canManageListedUsers && user && (
         <AddTeamMemberModal
+          open={addModalOpen}
           member={member}
           setMember={setMember}
           isAdmin={user.hierarchyRole === 'admin'}
@@ -600,6 +515,7 @@ export function UsersPage() {
       {editTarget && user && (
         <EditUserModal
           key={editTarget.id}
+          open={!!editTarget}
           target={editTarget}
           viewer={user}
           subs={(subs.data || []) as { id: string; email: string }[]}
@@ -611,6 +527,155 @@ export function UsersPage() {
           onSave={onSaveEdit}
         />
       )}
+
+      <PageHeader
+        eyebrow="People"
+        title={pageTitle}
+        description={pageDescription}
+        actions={
+          canManageListedUsers ? (
+            <Button onClick={() => setAddModalOpen(true)}>
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              Add student
+            </Button>
+          ) : undefined
+        }
+      />
+
+      <div className="ah-table-wrap">
+        <div className="border-b border-slate-200/80 p-4 dark:border-slate-700/80 sm:px-5">
+          <div className="relative max-w-md">
+            <svg
+              className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by email or name…"
+              className="pl-10"
+              inputSize="sm"
+            />
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          {isLoading ? (
+            <div className="space-y-0">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="flex animate-pulse items-center gap-4 border-b border-slate-100 px-5 py-4 dark:border-slate-800"
+                >
+                  <div className="h-10 w-10 rounded-full bg-slate-200 dark:bg-slate-700" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3.5 w-48 rounded bg-slate-200 dark:bg-slate-700" />
+                    <div className="h-3 w-28 rounded bg-slate-100 dark:bg-slate-800" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : memberRows.length === 0 && !search.trim() ? (
+            <EmptyState
+              title="No students yet"
+              description="Add a student to get started."
+              action={
+                canManageListedUsers ? (
+                  <Button onClick={() => setAddModalOpen(true)}>Add student</Button>
+                ) : undefined
+              }
+            />
+          ) : memberRows.length === 0 ? (
+            <EmptyState
+              title="No matches"
+              description="Try a different search term."
+              action={
+                <Button variant="secondary" onClick={() => setSearch('')}>
+                  Clear search
+                </Button>
+              }
+            />
+          ) : (
+            <table className="ah-table">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Permissions</th>
+                  {canManageListedUsers && <th className="text-right">Actions</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {memberRows.map((u: UserListRow) => {
+                  const name = [u.firstName, u.lastName].filter(Boolean).join(' ');
+                  const initials = name
+                    ? name
+                        .split(/\s+/)
+                        .slice(0, 2)
+                        .map((p) => p[0])
+                        .join('')
+                        .toUpperCase()
+                    : u.email.slice(0, 2).toUpperCase();
+                  return (
+                    <tr key={u.id}>
+                      <td>
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-brand-600 text-xs font-bold text-white">
+                            {initials}
+                          </div>
+                          <div className="min-w-0">
+                            {name ? (
+                              <p className="truncate text-sm font-medium text-slate-900 dark:text-white">
+                                {name}
+                              </p>
+                            ) : null}
+                            <code className="truncate font-mono text-xs font-medium text-slate-600 dark:text-slate-400">
+                              {u.email}
+                            </code>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <Badge tone="info">Student</Badge>
+                      </td>
+                      <td>
+                        <Badge tone={u.isActive ? 'success' : 'neutral'}>
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${u.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`}
+                          />
+                          {u.isActive ? 'Active' : 'Disabled'}
+                        </Badge>
+                      </td>
+                      <td className="max-w-xs text-xs text-slate-600 dark:text-slate-400">
+                        <span className="line-clamp-2">{formatPermissionList(u.permissions)}</span>
+                      </td>
+                      {canManageListedUsers && (
+                        <td className="whitespace-nowrap text-right">
+                          <Button variant="secondary" size="sm" onClick={() => setEditTarget(u)}>
+                            Edit
+                          </Button>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

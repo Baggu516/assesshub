@@ -32,7 +32,7 @@ export function LoginPage() {
     <div className="min-h-screen flex items-center justify-center p-6 bg-[rgb(var(--surface))]">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
-          <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 text-white font-bold text-lg mb-4">
+          <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand-600 text-white font-bold text-lg mb-4">
             A
           </div>
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">Sign in</h1>
@@ -91,7 +91,7 @@ export function LoginPage() {
           </form>
         </Card>
         <p className="text-center text-sm text-slate-500">
-          <Link className="text-indigo-600 hover:underline dark:text-indigo-400" to="/platform/login">
+          <Link className="text-brand-600 hover:underline dark:text-brand-400" to="/platform/login">
             Platform admin
           </Link>
         </p>

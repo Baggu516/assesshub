@@ -3,20 +3,67 @@
 @tailwind utilities;
 
 :root {
-  --surface: 248 250 252;
-  --surface-muted: 241 245 249;
+  --surface: 244 247 250;
+  --surface-muted: 232 238 244;
   color-scheme: light;
 }
 
 .dark {
-  --surface: 15 23 42;
-  --surface-muted: 30 41 59;
+  --surface: 11 18 28;
+  --surface-muted: 22 32 46;
   color-scheme: dark;
 }
 
 body {
-  @apply text-slate-900 dark:text-slate-100 min-h-screen antialiased;
+  @apply font-sans text-slate-900 dark:text-slate-100 min-h-screen antialiased;
   background-color: rgb(var(--surface));
+}
+
+@layer components {
+  .ah-page {
+    @apply animate-fade-up space-y-6;
+  }
+
+  .ah-table-wrap {
+    @apply overflow-hidden rounded-2xl border border-slate-200/80 bg-white/90 shadow-card backdrop-blur-sm
+      dark:border-slate-700/80 dark:bg-slate-900/70;
+  }
+
+  .ah-table {
+    @apply w-full text-sm;
+  }
+
+  .ah-table thead {
+    @apply border-b border-slate-200/80 bg-slate-50/90 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500
+      dark:border-slate-700/80 dark:bg-slate-950/50 dark:text-slate-400;
+  }
+
+  .ah-table th {
+    @apply px-4 py-3.5 font-semibold sm:px-5;
+  }
+
+  .ah-table tbody {
+    @apply divide-y divide-slate-100 dark:divide-slate-800/80;
+  }
+
+  .ah-table tbody tr {
+    @apply transition-colors duration-150 hover:bg-brand-50/40 dark:hover:bg-brand-500/[0.06];
+  }
+
+  .ah-table td {
+    @apply px-4 py-3.5 align-middle sm:px-5;
+  }
+
+  .ah-input {
+    @apply w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900
+      transition-colors placeholder:text-slate-400
+      focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/25
+      dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100;
+  }
+
+  .ah-label {
+    @apply block text-xs font-semibold text-slate-600 dark:text-slate-400;
+  }
 }
 
 @layer utilities {
@@ -24,4 +71,19 @@ body {
     scrollbar-width: thin;
     scrollbar-color: rgb(148 163 184 / 0.5) transparent;
   }
+}
+
+/* Kill browser autofill yellow/gray flash inside styled inputs */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: inherit;
+  transition: background-color 9999s ease-in-out 0s;
+  box-shadow: 0 0 0 1000px white inset;
+}
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover,
+.dark input:-webkit-autofill:focus {
+  box-shadow: 0 0 0 1000px rgb(2 6 23) inset;
+  -webkit-text-fill-color: rgb(241 245 249);
 }

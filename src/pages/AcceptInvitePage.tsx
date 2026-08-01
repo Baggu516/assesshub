@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { api, setTokens } from '@/lib/api';
 import { useTenant } from '@/context/TenantContext';
-import { Card } from '@/components/ui/Card';
+import { Button, Card, FormField, Input } from '@/components/ui';
 import type { AuthUser } from '@/types/user';
 import { useAuth } from '@/context/AuthContext';
 
@@ -53,24 +53,19 @@ export function AcceptInvitePage() {
           <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Accept invitation</h1>
           <p className="mt-1 text-sm text-slate-500">Set a password to join your workspace.</p>
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
-            <div>
-              <label className="block text-xs font-medium mb-1">New password</label>
-              <input
+            <FormField label="New password" htmlFor="invite-password" required>
+              <Input
+                id="invite-password"
                 type="password"
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-950"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 minLength={8}
                 required
               />
-            </div>
-            <button
-              type="submit"
-              disabled={loading || !token}
-              className="w-full rounded-lg bg-indigo-600 text-white py-2.5 text-sm font-medium disabled:opacity-50"
-            >
+            </FormField>
+            <Button type="submit" className="w-full" disabled={loading || !token}>
               {loading ? 'Saving…' : 'Activate account'}
-            </button>
+            </Button>
           </form>
         </Card>
       </div>

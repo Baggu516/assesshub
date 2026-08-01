@@ -3,7 +3,7 @@ import { forwardRef, type ButtonHTMLAttributes } from 'react';
 
 const variants = {
   primary:
-    'bg-indigo-600 text-white hover:bg-indigo-500 shadow-sm dark:shadow-none focus-visible:ring-indigo-500',
+    'bg-brand-600 text-white hover:bg-brand-500 shadow-sm shadow-brand-600/20 dark:shadow-none focus-visible:ring-brand-500',
   secondary:
     'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 focus-visible:ring-slate-400',
   ghost:
@@ -38,9 +38,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       type={type}
       disabled={disabled}
       className={clsx(
-        'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors',
+        'inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-all duration-150',
         'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(var(--surface))]',
         'disabled:pointer-events-none disabled:opacity-50',
+        'active:scale-[0.98]',
         variants[variant],
         sizes[size],
         className

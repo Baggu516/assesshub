@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { Card } from '@/components/ui/Card';
+import { Button, Card, FormField, Input } from '@/components/ui';
 import {
   useTenantOrganization,
   useTenantOrganizationMutations,
@@ -86,107 +86,94 @@ export function SettingsPage() {
             <p className="text-xs text-slate-500">
               Optional names for navigation items. Leave blank to use the default. Applies to everyone in this organization.
             </p>
-            <div className="grid md:grid-cols-2 gap-4 text-sm">
-              <label className="block">
-                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Dashboard</span>
-                <input
-                  className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2"
+            <div className="grid md:grid-cols-2 gap-4">
+              <FormField label="Dashboard" htmlFor="nav-dashboard">
+                <Input
+                  id="nav-dashboard"
                   placeholder="Dashboard"
                   value={navDashboard}
                   onChange={(e) => setNavDashboard(e.target.value)}
                   maxLength={48}
                 />
-              </label>
-              <label className="block">
-                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Assessments</span>
-                <input
-                  className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2"
+              </FormField>
+              <FormField label="Assessments" htmlFor="nav-assessments">
+                <Input
+                  id="nav-assessments"
                   placeholder="Assessments"
                   value={navAssessments}
                   onChange={(e) => setNavAssessments(e.target.value)}
                   maxLength={48}
                 />
-              </label>
-              <label className="block md:col-span-2">
-                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Teachers</span>
-                <input
-                  className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2"
+              </FormField>
+              <FormField label="Teachers" htmlFor="nav-teachers" className="md:col-span-2">
+                <Input
+                  id="nav-teachers"
                   placeholder="Teachers"
                   value={navSubordinates}
                   onChange={(e) => setNavSubordinates(e.target.value)}
                   maxLength={48}
                 />
-              </label>
-              <label className="block">
-                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Classes</span>
-                <input
-                  className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2"
+              </FormField>
+              <FormField label="Classes" htmlFor="nav-classes">
+                <Input
+                  id="nav-classes"
                   placeholder="Classes"
                   value={navClasses}
                   onChange={(e) => setNavClasses(e.target.value)}
                   maxLength={48}
                 />
-              </label>
-              <label className="block">
-                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Students (admin)</span>
-                <input
-                  className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2"
+              </FormField>
+              <FormField label="Students (admin)" htmlFor="nav-users">
+                <Input
+                  id="nav-users"
                   placeholder="Users"
                   value={navUsers}
                   onChange={(e) => setNavUsers(e.target.value)}
                   maxLength={48}
                 />
-              </label>
-              <label className="block">
-                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Students (teacher)</span>
-                <input
-                  className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2"
+              </FormField>
+              <FormField label="Students (teacher)" htmlFor="nav-users-member">
+                <Input
+                  id="nav-users-member"
                   placeholder="People"
                   value={navUsersMember}
                   onChange={(e) => setNavUsersMember(e.target.value)}
                   maxLength={48}
                 />
-              </label>
-              <label className="block">
-                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Profile</span>
-                <input
-                  className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2"
+              </FormField>
+              <FormField label="Profile" htmlFor="nav-profile">
+                <Input
+                  id="nav-profile"
                   placeholder="Profile"
                   value={navProfile}
                   onChange={(e) => setNavProfile(e.target.value)}
                   maxLength={48}
                 />
-              </label>
-              <label className="block">
-                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Organization</span>
-                <input
-                  className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2"
+              </FormField>
+              <FormField label="Organization" htmlFor="nav-organization">
+                <Input
+                  id="nav-organization"
                   placeholder="Organization"
                   value={navOrganization}
                   onChange={(e) => setNavOrganization(e.target.value)}
                   maxLength={48}
                 />
-              </label>
-              <label className="block">
-                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Settings</span>
-                <input
-                  className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2"
+              </FormField>
+              <FormField label="Settings" htmlFor="nav-settings">
+                <Input
+                  id="nav-settings"
                   placeholder="Settings"
                   value={navSettings}
                   onChange={(e) => setNavSettings(e.target.value)}
                   maxLength={48}
                 />
-              </label>
+              </FormField>
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={save.isPending}
-            className="rounded-lg bg-indigo-600 text-white px-4 py-2 text-sm font-medium"
-          >
+          <Button type="submit" disabled={save.isPending}>
             {save.isPending ? 'Saving…' : 'Save changes'}
-          </button>
+          </Button>
         </form>
       </Card>
     </div>

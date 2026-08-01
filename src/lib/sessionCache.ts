@@ -3,11 +3,14 @@ import type { AuthUser } from '@/types/user';
 const USER_PREFIX = 'ah_session_user:';
 const TENANT_PREFIX = 'ah_session_tenant:';
 
+export type OrgPlan = 'assessments_only' | 'ai_dashboard';
+
 export type CachedTenantOrganization = {
   id: string;
   name: string;
   subdomain: string;
   isActive: boolean;
+  plan?: OrgPlan;
   createdAt?: string;
   updatedAt?: string;
   settings?: {

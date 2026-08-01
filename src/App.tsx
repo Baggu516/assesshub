@@ -11,8 +11,12 @@ import { ProfilePage } from './pages/ProfilePage';
 import { SettingsPage } from './pages/SettingsPage';
 import { KnowledgeBasePage } from './pages/KnowledgeBasePage';
 import { AssessmentsPage } from './pages/AssessmentsPage';
+import { AssessmentBuilderPage } from './pages/AssessmentBuilderPage';
 import { GroupStudentsPage } from './pages/GroupStudentsPage';
 import { ClassesPage } from './pages/ClassesPage';
+import { AcademicYearsPage } from './pages/AcademicYearsPage';
+import { ClassMastersPage } from './pages/ClassMastersPage';
+import { PromotionsPage } from './pages/PromotionsPage';
 import { MyAssessmentsPage } from './pages/MyAssessmentsPage';
 import { TakeAssessmentPage } from './pages/TakeAssessmentPage';
 import { OrganizationPage } from './pages/OrganizationPage';
@@ -121,6 +125,36 @@ export default function App() {
           }
         />
         <Route
+          path="academic-years"
+          element={
+            <RequireHierarchy roles={['admin']}>
+              <RequirePermission keys={[PERMISSIONS.CLASS_MANAGE, PERMISSIONS.SETTINGS_MANAGE]}>
+                <AcademicYearsPage />
+              </RequirePermission>
+            </RequireHierarchy>
+          }
+        />
+        <Route
+          path="class-masters"
+          element={
+            <RequireHierarchy roles={['admin']}>
+              <RequirePermission keys={[PERMISSIONS.CLASS_MANAGE, PERMISSIONS.SETTINGS_MANAGE]}>
+                <ClassMastersPage />
+              </RequirePermission>
+            </RequireHierarchy>
+          }
+        />
+        <Route
+          path="promotions"
+          element={
+            <RequireHierarchy roles={['admin']}>
+              <RequirePermission keys={[PERMISSIONS.CLASS_MANAGE, PERMISSIONS.SETTINGS_MANAGE]}>
+                <PromotionsPage />
+              </RequirePermission>
+            </RequireHierarchy>
+          }
+        />
+        <Route
           path="group-students"
           element={
             <RequireHierarchy roles={['subordinate']}>
@@ -136,6 +170,26 @@ export default function App() {
             <RequireHierarchy roles={['subordinate']}>
               <RequirePermission keys={[PERMISSIONS.ASSESSMENT_CREATE]}>
                 <AssessmentsPage />
+              </RequirePermission>
+            </RequireHierarchy>
+          }
+        />
+        <Route
+          path="assessments/new"
+          element={
+            <RequireHierarchy roles={['subordinate']}>
+              <RequirePermission keys={[PERMISSIONS.ASSESSMENT_CREATE]}>
+                <AssessmentBuilderPage />
+              </RequirePermission>
+            </RequireHierarchy>
+          }
+        />
+        <Route
+          path="assessments/:assessmentId/edit"
+          element={
+            <RequireHierarchy roles={['subordinate']}>
+              <RequirePermission keys={[PERMISSIONS.ASSESSMENT_CREATE]}>
+                <AssessmentBuilderPage />
               </RequirePermission>
             </RequireHierarchy>
           }

@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { clearPlatformSession, platformApi, setPlatformToken } from '@/lib/platformApi';
+import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
 
 export function PlatformLoginPage() {
   const navigate = useNavigate();
@@ -30,47 +32,55 @@ export function PlatformLoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-[rgb(var(--surface))]">
-      <div className="w-full max-w-md space-y-6">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[rgb(var(--surface))] p-6">
+      <div className="pointer-events-none absolute inset-0 bg-mesh-light dark:bg-mesh-dark" aria-hidden />
+      <div
+        className="pointer-events-none absolute -left-24 top-1/4 h-72 w-72 rounded-full bg-brand-400/20 blur-3xl dark:bg-brand-500/10"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute -right-16 bottom-1/4 h-64 w-64 rounded-full bg-cyan-400/15 blur-3xl"
+        aria-hidden
+      />
+
+      <div className="relative z-10 w-full max-w-md animate-fade-up space-y-6">
         <div className="text-center">
-          <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">Platform admin</h1>
-          <p className="mt-1 text-sm text-slate-500">Sign in with your platform credentials</p>
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-cyan-600 text-white shadow-glow">
+            <span className="font-display text-sm font-bold">AH</span>
+          </div>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+            Platform admin
+          </h1>
+          <p className="mt-1.5 text-sm text-slate-500">Sign in with your platform credentials</p>
         </div>
-        <Card>
+
+        <Card className="shadow-glow">
           <form onSubmit={onSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                Email
-              </label>
-              <input
+            <label className="ah-label">
+              Email
+              <Input
                 type="email"
                 autoComplete="username"
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-sm"
+                className="mt-1.5"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
               />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                Password
-              </label>
-              <input
+            </label>
+            <label className="ah-label">
+              Password
+              <Input
                 type="password"
                 autoComplete="current-password"
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-sm"
+                className="mt-1.5"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium py-2.5 disabled:opacity-60"
-            >
+            </label>
+            <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Signing in…' : 'Sign in'}
-            </button>
+            </Button>
           </form>
         </Card>
       </div>

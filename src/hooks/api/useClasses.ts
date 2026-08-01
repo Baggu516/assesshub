@@ -6,6 +6,7 @@ export interface ClassMemberRow {
   email: string;
   label: string;
   hierarchyRole?: string;
+  enrollmentId?: string;
 }
 
 export interface SchoolClass {
@@ -13,6 +14,9 @@ export interface SchoolClass {
   name: string;
   description: string;
   academicYear: string;
+  academicYearId: string | null;
+  classMasterId: string | null;
+  section: string;
   createdBy: string | null;
   isActive: boolean;
   teacherCount: number;
@@ -23,12 +27,13 @@ export interface SchoolClass {
   updatedAt?: string;
 }
 
-export function useClassesQuery(enabled = true) {
+export function useClassesQuery(enabled = true, academicYearId?: string | null) {
   return useQuery({
-    queryKey: ['classes'],
+    queryKey: ['classes', academicYearId || 'all'],
     enabled,
     queryFn: async () => {
-      const { data } = await api.get<{ classes: SchoolClass[] }>('/classes');
+      const params = academicYearId ? { academicYearId } : undefined;
+      const { data } = await api.get<{ classes: SchoolClass[] }>('/classes', { params });
       return data.classes;
     },
   });
@@ -58,9 +63,11 @@ export function useClassMutations() {
 
   const create = useMutation({
     mutationFn: async (body: {
-      name: string;
+      name?: string;
       description?: string;
-      academicYear?: string;
+      academicYearId: string;
+      classMasterId: string;
+      section?: string;
       teacherIds: string[];
       studentIds: string[];
     }) => {
@@ -78,7 +85,9 @@ export function useClassMutations() {
       id: string;
       name?: string;
       description?: string;
-      academicYear?: string;
+      academicYearId?: string;
+      classMasterId?: string;
+      section?: string;
       isActive?: boolean;
       teacherIds?: string[];
       studentIds?: string[];

@@ -47,6 +47,24 @@ function NavIcon({ to }: { to: string }) {
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
         </svg>
       );
+    case '/academic-years':
+      return (
+        <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      );
+    case '/class-masters':
+      return (
+        <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+        </svg>
+      );
+    case '/promotions':
+      return (
+        <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+        </svg>
+      );
     case '/profile':
       return (
         <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
@@ -122,6 +140,7 @@ export function AppLayout() {
   const { data: org } = useTenantOrganization();
 
   const sidebarLabels = org?.settings?.sidebarLabels;
+  const hasAiPlan = (org?.plan ?? 'ai_dashboard') === 'ai_dashboard';
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_KEY, collapsed ? '1' : '0');
@@ -142,8 +161,35 @@ export function AppLayout() {
         show: !!user && can(user.permissions, PERMISSIONS.SUBORDINATE_CREATE),
       },
       {
+        to: '/academic-years',
+        label: resolveNavLabel('/academic-years', user?.hierarchyRole, sidebarLabels),
+        show:
+          !!user &&
+          user.hierarchyRole === 'admin' &&
+          (can(user.permissions, PERMISSIONS.CLASS_MANAGE) ||
+            can(user.permissions, PERMISSIONS.SETTINGS_MANAGE)),
+      },
+      {
+        to: '/class-masters',
+        label: resolveNavLabel('/class-masters', user?.hierarchyRole, sidebarLabels),
+        show:
+          !!user &&
+          user.hierarchyRole === 'admin' &&
+          (can(user.permissions, PERMISSIONS.CLASS_MANAGE) ||
+            can(user.permissions, PERMISSIONS.SETTINGS_MANAGE)),
+      },
+      {
         to: '/classes',
         label: resolveNavLabel('/classes', user?.hierarchyRole, sidebarLabels),
+        show:
+          !!user &&
+          user.hierarchyRole === 'admin' &&
+          (can(user.permissions, PERMISSIONS.CLASS_MANAGE) ||
+            can(user.permissions, PERMISSIONS.SETTINGS_MANAGE)),
+      },
+      {
+        to: '/promotions',
+        label: resolveNavLabel('/promotions', user?.hierarchyRole, sidebarLabels),
         show:
           !!user &&
           user.hierarchyRole === 'admin' &&
@@ -187,11 +233,11 @@ export function AppLayout() {
       {
         to: '/knowledge-base',
         label: resolveNavLabel('/knowledge-base', user?.hierarchyRole, sidebarLabels),
-        show: user?.hierarchyRole === 'admin',
+        show: hasAiPlan && user?.hierarchyRole === 'admin',
       },
     ];
     },
-    [user, sidebarLabels]
+    [user, sidebarLabels, hasAiPlan]
   );
 
   const visibleItems = useMemo(() => items.filter((i) => i.show), [items]);
@@ -224,10 +270,10 @@ export function AppLayout() {
     );
 
   return (
-    <div className="min-h-screen flex bg-[rgb(var(--surface))]">
+    <div className="h-dvh flex overflow-hidden bg-[rgb(var(--surface))]">
       <aside
         className={clsx(
-          'hidden md:flex flex-col border-r border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-950/80 backdrop-blur transition-[width] duration-200 ease-out shrink-0',
+          'hidden md:flex flex-col border-r border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-950/80 backdrop-blur transition-[width] duration-200 ease-out shrink-0 h-full',
           collapsed ? 'w-[76px]' : 'w-64'
         )}
       >
@@ -244,7 +290,7 @@ export function AppLayout() {
                 <span className="ml-2 text-xs text-slate-500 shrink-0 hidden xl:inline">Education</span>
               </>
             ) : (
-              <span className="font-bold text-lg text-indigo-600 dark:text-indigo-400" title="AssessHub">
+              <span className="font-bold text-lg text-brand-600 dark:text-brand-400" title="AssessHub">
                 A
               </span>
             )}
@@ -272,7 +318,7 @@ export function AppLayout() {
                     'flex items-center gap-3 rounded-lg py-2.5 text-sm font-medium transition-colors',
                     collapsed ? 'justify-center px-2' : 'px-3',
                     isActive
-                      ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-200'
+                      ? 'bg-brand-50 text-brand-800 dark:bg-brand-500/10 dark:text-brand-200'
                       : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
                   )
                 }
@@ -321,7 +367,7 @@ export function AppLayout() {
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
         {mobileNavOpen && (
           <button
             type="button"
@@ -360,7 +406,7 @@ export function AppLayout() {
                   clsx(
                     'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium',
                     isActive
-                      ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-200'
+                      ? 'bg-brand-50 text-brand-800 dark:bg-brand-500/10 dark:text-brand-200'
                       : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
                   )
                 }
@@ -408,12 +454,12 @@ export function AppLayout() {
           </svg>
         </button>
 
-        <main className="flex-1 w-full min-w-0 p-4 pt-16 md:pt-8 md:p-8 overflow-auto">
+        <main className="flex-1 w-full min-w-0 min-h-0 p-4 pt-16 md:pt-8 md:p-8 overflow-y-auto">
           <div className="w-full">
             <Outlet />
           </div>
         </main>
-        <AiChatWidget />
+        {hasAiPlan ? <AiChatWidget /> : null}
       </div>
     </div>
   );

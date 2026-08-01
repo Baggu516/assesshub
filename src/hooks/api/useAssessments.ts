@@ -63,7 +63,7 @@ export interface AssessmentAssignment {
 
 export function useAssessmentsQuery(params?: { status?: string; page?: number }) {
   return useQuery({
-    queryKey: ['assessments', params],
+    queryKey: ['assessments', 'list', params ?? {}],
     queryFn: async () => {
       const { data } = await api.get<{ assessments: Assessment[]; total: number }>('/assessments', {
         params,
@@ -75,7 +75,7 @@ export function useAssessmentsQuery(params?: { status?: string; page?: number })
 
 export function useAssessmentQuery(id: string | undefined) {
   return useQuery({
-    queryKey: ['assessments', id],
+    queryKey: ['assessments', 'detail', id],
     enabled: Boolean(id),
     queryFn: async () => {
       const { data } = await api.get<{ assessment: Assessment }>(`/assessments/${id}`);

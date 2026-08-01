@@ -1,338 +1,34 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Card } from '@/components/ui/Card';
-import { PageHeader } from '@/components/ui/PageHeader';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
-import { Skeleton } from '@/components/ui/Spinner';
+import clsx from 'clsx';
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  FormField,
+  Input,
+  Modal,
+  PageHeader,
+  Skeleton,
+} from '@/components/ui';
 import {
   useAssessmentsQuery,
   useAssessmentResultsQuery,
   useAssessmentMutations,
   type Assessment,
-  type AssessmentQuestion,
-  type QuestionType,
 } from '@/hooks/api/useAssessments';
 import { useStudentGroupsQuery } from '@/hooks/api/useStudentGroups';
 
-const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
-  single_select: 'Single select',
-  multi_select: 'Multi select',
-  short_answer: 'Short answer',
-};
-
-function emptyQuestion(type: QuestionType, order: number): AssessmentQuestion {
-  if (type === 'short_answer') {
-    return {
-      type,
-      prompt: '',
-      points: 1,
-      order,
-      options: [],
-      acceptedAnswers: [''],
-      caseSensitive: false,
-    };
-  }
-  return {
-    type,
-    prompt: '',
-    points: 1,
-    order,
-    options: [
-      { text: '', isCorrect: type === 'single_select' },
-      { text: '', isCorrect: false },
-    ],
-  };
-}
-
-function QuestionEditor({
-  question,
-  index,
-  onChange,
-  onRemove,
-}: {
-  question: AssessmentQuestion;
-  index: number;
-  onChange: (q: AssessmentQuestion) => void;
-  onRemove: () => void;
-}) {
-  return (
-    <Card className="p-4 space-y-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-slate-500">Q{index + 1}</span>
-          <Badge tone="info">{QUESTION_TYPE_LABELS[question.type]}</Badge>
-        </div>
-        <Button type="button" variant="danger" size="sm" onClick={onRemove}>
-          Remove
-        </Button>
-      </div>
-
-      <textarea
-        placeholder="Question prompt *"
-        className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm min-h-[72px]"
-        value={question.prompt}
-        onChange={(e) => onChange({ ...question, prompt: e.target.value })}
-      />
-
-      <div className="flex items-center gap-3">
-        <label className="text-xs text-slate-500">Points</label>
-        <input
-          type="number"
-          min={0}
-          max={100}
-          className="w-20 rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-sm"
-          value={question.points}
-          onChange={(e) => onChange({ ...question, points: Number(e.target.value) || 0 })}
-        />
-      </div>
-
-      {(question.type === 'single_select' || question.type === 'multi_select') && (
-        <div className="space-y-2">
-          <p className="text-xs text-slate-500">Options (mark correct answer{question.type === 'multi_select' ? 's' : ''})</p>
-          {question.options.map((opt, oi) => (
-            <div key={oi} className="flex items-center gap-2">
-              <input
-                type={question.type === 'single_select' ? 'radio' : 'checkbox'}
-                name={`q-${index}-correct`}
-                checked={!!opt.isCorrect}
-                onChange={() => {
-                  const options = question.options.map((o, i) => {
-                    if (question.type === 'single_select') {
-                      return { ...o, isCorrect: i === oi };
-                    }
-                    return i === oi ? { ...o, isCorrect: !o.isCorrect } : o;
-                  });
-                  onChange({ ...question, options });
-                }}
-              />
-              <input
-                placeholder={`Option ${oi + 1}`}
-                className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-sm"
-                value={opt.text}
-                onChange={(e) => {
-                  const options = question.options.map((o, i) =>
-                    i === oi ? { ...o, text: e.target.value } : o
-                  );
-                  onChange({ ...question, options });
-                }}
-              />
-              {question.options.length > 2 && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    onChange({ ...question, options: question.options.filter((_, i) => i !== oi) })
-                  }
-                >
-                  ×
-                </Button>
-              )}
-            </div>
-          ))}
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() =>
-              onChange({
-                ...question,
-                options: [...question.options, { text: '', isCorrect: false }],
-              })
-            }
-          >
-            Add option
-          </Button>
-        </div>
-      )}
-
-      {question.type === 'short_answer' && (
-        <div className="space-y-2">
-          <p className="text-xs text-slate-500">Accepted answers (1–2 words each)</p>
-          {(question.acceptedAnswers || ['']).map((ans, ai) => (
-            <div key={ai} className="flex gap-2">
-              <input
-                placeholder="e.g. Paris"
-                className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-sm"
-                value={ans}
-                onChange={(e) => {
-                  const acceptedAnswers = [...(question.acceptedAnswers || [''])];
-                  acceptedAnswers[ai] = e.target.value;
-                  onChange({ ...question, acceptedAnswers });
-                }}
-              />
-              {(question.acceptedAnswers?.length || 0) > 1 && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    onChange({
-                      ...question,
-                      acceptedAnswers: question.acceptedAnswers?.filter((_, i) => i !== ai),
-                    })
-                  }
-                >
-                  ×
-                </Button>
-              )}
-            </div>
-          ))}
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() =>
-              onChange({
-                ...question,
-                acceptedAnswers: [...(question.acceptedAnswers || []), ''],
-              })
-            }
-          >
-            Add alternate answer
-          </Button>
-          <label className="flex items-center gap-2 text-xs text-slate-500">
-            <input
-              type="checkbox"
-              checked={question.caseSensitive ?? false}
-              onChange={(e) => onChange({ ...question, caseSensitive: e.target.checked })}
-            />
-            Case sensitive
-          </label>
-        </div>
-      )}
-    </Card>
-  );
-}
-
-function AssessmentBuilderModal({
-  initial,
-  onClose,
-  onSave,
-  saving,
-}: {
-  initial?: Assessment | null;
-  onClose: () => void;
-  onSave: (data: { title: string; description: string; questions: AssessmentQuestion[] }) => void;
-  saving: boolean;
-}) {
-  const [title, setTitle] = useState(initial?.title || '');
-  const [description, setDescription] = useState(initial?.description || '');
-  const [questions, setQuestions] = useState<AssessmentQuestion[]>(
-    initial?.questions?.length
-      ? initial.questions.map((q, i) => ({ ...q, order: i }))
-      : [emptyQuestion('single_select', 0)]
-  );
-
-  const canSave = useMemo(() => {
-    if (!title.trim() || !questions.length) return false;
-    return questions.every((q) => {
-      if (!q.prompt.trim()) return false;
-      if (q.type === 'short_answer') {
-        return (q.acceptedAnswers || []).some((a) => a.trim());
-      }
-      if (q.options.length < 2) return false;
-      const correct = q.options.filter((o) => o.isCorrect && o.text.trim());
-      if (q.type === 'single_select') return correct.length === 1;
-      return correct.length >= 1 && q.options.every((o) => o.text.trim());
-    });
-  }, [title, questions]);
-
-  const addQuestion = (type: QuestionType) => {
-    setQuestions((qs) => [...qs, emptyQuestion(type, qs.length)]);
-  };
-
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    if (!canSave || saving) return;
-    onSave({
-      title: title.trim(),
-      description: description.trim(),
-      questions: questions.map((q, i) => ({
-        ...q,
-        order: i,
-        options: q.options.map(({ text, isCorrect }) => ({ text: text.trim(), isCorrect: !!isCorrect })),
-        acceptedAnswers: (q.acceptedAnswers || []).map((a) => a.trim()).filter(Boolean),
-      })),
-    });
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" role="dialog">
-      <Card className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
-              {initial ? 'Edit assessment' : 'Create assessment'}
-            </h3>
-            <p className="text-xs text-slate-500 mt-1">Add questions — single select, multi select, or short answer.</p>
-          </div>
-          <button type="button" onClick={onClose} className="text-slate-500 hover:text-slate-800 text-sm">
-            Close
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-          <input
-            placeholder="Assessment title *"
-            className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-          <textarea
-            placeholder="Description (optional)"
-            className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm min-h-[60px]"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-
-          <div className="space-y-3">
-            {questions.map((q, i) => (
-              <QuestionEditor
-                key={i}
-                question={q}
-                index={i}
-                onChange={(updated) =>
-                  setQuestions((qs) => qs.map((item, idx) => (idx === i ? updated : item)))
-                }
-                onRemove={() => setQuestions((qs) => qs.filter((_, idx) => idx !== i))}
-              />
-            ))}
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" size="sm" onClick={() => addQuestion('single_select')}>
-              + Single select
-            </Button>
-            <Button type="button" variant="secondary" size="sm" onClick={() => addQuestion('multi_select')}>
-              + Multi select
-            </Button>
-            <Button type="button" variant="secondary" size="sm" onClick={() => addQuestion('short_answer')}>
-              + Short answer
-            </Button>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="secondary" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={!canSave || saving}>
-              {saving ? 'Saving…' : initial ? 'Save changes' : 'Create draft'}
-            </Button>
-          </div>
-        </form>
-      </Card>
-    </div>
-  );
-}
-
 function AssignModal({
+  open,
   assessment,
   onClose,
   onAssign,
   saving,
 }: {
+  open: boolean;
   assessment: Assessment;
   onClose: () => void;
   onAssign: (groupIds: string[], dueDate: string | null) => void;
@@ -362,59 +58,13 @@ function AssignModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" role="dialog">
-      <Card className="max-w-md w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Assign to groups</h3>
-            <p className="text-xs text-slate-500 mt-1">{assessment.title}</p>
-          </div>
-          <button type="button" onClick={onClose} className="text-slate-500 text-sm">
-            Close
-          </button>
-        </div>
-
-        <div className="mt-4 space-y-3">
-          <label className="block text-xs text-slate-500">Due date (optional)</label>
-          <input
-            type="datetime-local"
-            className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-          />
-
-          {isLoading ? (
-            <Skeleton className="h-24" />
-          ) : groups.length === 0 ? (
-            <p className="text-sm text-slate-500">
-              No student groups yet. Create groups under Group students first.
-            </p>
-          ) : (
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {groups.map((g) => (
-                <label key={g.id} className="flex items-start gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={selected.has(g.id)}
-                    onChange={() => toggle(g.id)}
-                  />
-                  <span>
-                    <span className="font-medium">{g.name}</span>
-                    <span className="block text-xs text-slate-400">
-                      {g.memberCount} student{g.memberCount !== 1 ? 's' : ''}
-                      {g.members?.length
-                        ? ` · ${g.members.map((m) => m.label).join(', ')}`
-                        : ''}
-                    </span>
-                  </span>
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="flex justify-end gap-2 mt-4">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Assign to groups"
+      description={assessment.title}
+      footer={
+        <>
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancel
           </Button>
@@ -427,54 +77,127 @@ function AssignModal({
               ? 'Assigning…'
               : `Assign to ${selectedStudentCount} student${selectedStudentCount !== 1 ? 's' : ''}`}
           </Button>
-        </div>
-      </Card>
-    </div>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <FormField label="Due date" htmlFor="assign-due" hint="Optional">
+          <Input
+            id="assign-due"
+            type="datetime-local"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+          />
+        </FormField>
+
+        {isLoading ? (
+          <Skeleton className="h-24" />
+        ) : groups.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-slate-200 px-3 py-4 text-sm text-slate-500 dark:border-slate-700">
+            No student groups yet. Create groups under Group students first.
+          </p>
+        ) : (
+          <div className="space-y-2 max-h-56 overflow-y-auto">
+            {groups.map((g) => {
+              const checked = selected.has(g.id);
+              return (
+                <button
+                  key={g.id}
+                  type="button"
+                  onClick={() => toggle(g.id)}
+                  className={clsx(
+                    'flex w-full items-start gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors',
+                    checked
+                      ? 'border-brand-400 bg-brand-50/70 dark:border-brand-500/50 dark:bg-brand-500/10'
+                      : 'border-slate-200 hover:border-slate-300 dark:border-slate-600 dark:hover:border-slate-500'
+                  )}
+                >
+                  <span
+                    className={clsx(
+                      'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border-2',
+                      checked
+                        ? 'border-brand-600 bg-brand-600 text-white'
+                        : 'border-slate-300 dark:border-slate-500'
+                    )}
+                    aria-hidden
+                  >
+                    {checked && (
+                      <svg className="h-2.5 w-2.5" viewBox="0 0 12 12" fill="none">
+                        <path
+                          d="M2 6l3 3 5-5"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    )}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-slate-900 dark:text-white">
+                      {g.name}
+                    </span>
+                    <span className="block text-xs text-slate-500">
+                      {g.memberCount} student{g.memberCount !== 1 ? 's' : ''}
+                      {g.members?.length ? ` · ${g.members.map((m) => m.label).join(', ')}` : ''}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </Modal>
   );
 }
 
-function ResultsModal({ assessmentId, onClose }: { assessmentId: string; onClose: () => void }) {
+function ResultsModal({
+  open,
+  assessmentId,
+  onClose,
+}: {
+  open: boolean;
+  assessmentId: string;
+  onClose: () => void;
+}) {
   const { data, isLoading } = useAssessmentResultsQuery(assessmentId);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" role="dialog">
-      <Card className="max-w-lg w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Results</h3>
-            <p className="text-xs text-slate-500 mt-1">{data?.assessment.title}</p>
-          </div>
-          <button type="button" onClick={onClose} className="text-slate-500 text-sm">
-            Close
-          </button>
-        </div>
-
-        {isLoading ? (
-          <Skeleton className="h-32 mt-4" />
-        ) : !data?.results.length ? (
-          <p className="text-sm text-slate-500 mt-4">No assignments yet.</p>
-        ) : (
-          <div className="mt-4 space-y-2">
-            {data.results.map((r) => (
-              <div
-                key={r.id}
-                className="flex items-center justify-between rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm"
-              >
-                <div>
-                  <p className="font-medium">{r.studentLabel}</p>
-                  <p className="text-xs text-slate-500">{r.studentEmail}</p>
-                </div>
-                <div className="text-right">
-                  <Badge tone={r.status === 'submitted' ? 'success' : 'warning'}>
-                    {r.status === 'submitted' ? `${r.score}/${r.maxScore}` : 'Pending'}
-                  </Badge>
-                </div>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Results"
+      description={data?.assessment.title}
+      footer={
+        <Button type="button" variant="secondary" onClick={onClose}>
+          Close
+        </Button>
+      }
+    >
+      {isLoading ? (
+        <Skeleton className="h-32" />
+      ) : !data?.results.length ? (
+        <p className="text-sm text-slate-500">No assignments yet.</p>
+      ) : (
+        <div className="space-y-2">
+          {data.results.map((r) => (
+            <div
+              key={r.id}
+              className="flex items-center justify-between rounded-xl border border-slate-200/80 px-3 py-2.5 text-sm dark:border-slate-700"
+            >
+              <div className="min-w-0">
+                <p className="font-medium text-slate-900 dark:text-white truncate">{r.studentLabel}</p>
+                <p className="text-xs text-slate-500 truncate">{r.studentEmail}</p>
               </div>
-            ))}
-          </div>
-        )}
-      </Card>
-    </div>
+              <Badge tone={r.status === 'submitted' ? 'success' : 'warning'}>
+                {r.status === 'submitted' ? `${r.score}/${r.maxScore}` : 'Pending'}
+              </Badge>
+            </div>
+          ))}
+        </div>
+      )}
+    </Modal>
   );
 }
 
@@ -485,31 +208,13 @@ function statusTone(status: Assessment['status']) {
 }
 
 export function AssessmentsPage() {
+  const navigate = useNavigate();
   const { data, isLoading } = useAssessmentsQuery();
-  const { create, update, publish, assign } = useAssessmentMutations();
-  const [builderTarget, setBuilderTarget] = useState<Assessment | null | 'new'>('new');
+  const { publish, assign } = useAssessmentMutations();
   const [assignTarget, setAssignTarget] = useState<Assessment | null>(null);
   const [resultsId, setResultsId] = useState<string | null>(null);
-  const [showBuilder, setShowBuilder] = useState(false);
 
   const assessments = data?.assessments ?? [];
-
-  const handleSave = async (form: { title: string; description: string; questions: AssessmentQuestion[] }) => {
-    try {
-      if (builderTarget && builderTarget !== 'new') {
-        await update.mutateAsync({ id: builderTarget.id, ...form });
-        toast.success('Assessment updated');
-      } else {
-        await create.mutateAsync(form);
-        toast.success('Assessment created');
-      }
-      setShowBuilder(false);
-      setBuilderTarget(null);
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      toast.error(msg || 'Failed to save assessment');
-    }
-  };
 
   const handlePublish = async (id: string) => {
     try {
@@ -539,14 +244,7 @@ export function AssessmentsPage() {
         title="Assessment dashboard"
         description="Create questions, publish assessments, and assign them to student groups."
         actions={
-          <Button
-            onClick={() => {
-              setBuilderTarget('new');
-              setShowBuilder(true);
-            }}
-          >
-            New assessment
-          </Button>
+          <Button onClick={() => navigate('/assessments/new')}>New assessment</Button>
         }
       />
 
@@ -556,33 +254,37 @@ export function AssessmentsPage() {
           <Skeleton className="h-20" />
         </div>
       ) : assessments.length === 0 ? (
-        <Card className="p-8 text-center text-sm text-slate-500">
-          No assessments yet. Create your first assessment to get started.
+        <Card className="p-0">
+          <EmptyState
+            title="No assessments yet"
+            description="Create your first assessment to start assigning quizzes to students."
+            action={<Button onClick={() => navigate('/assessments/new')}>New assessment</Button>}
+          />
         </Card>
       ) : (
         <div className="space-y-3">
           {assessments.map((a) => (
-            <Card key={a.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <Card
+              key={a.id}
+              className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+            >
               <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-medium text-slate-900 dark:text-white truncate">{a.title}</h3>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-semibold text-slate-900 dark:text-white truncate">{a.title}</h3>
                   <Badge tone={statusTone(a.status)}>{a.status}</Badge>
                 </div>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="mt-1 text-xs text-slate-500">
                   {a.questions.length} question{a.questions.length !== 1 ? 's' : ''}
                   {a.description ? ` · ${a.description}` : ''}
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2 shrink-0">
+              <div className="flex shrink-0 flex-wrap gap-2">
                 {a.status === 'draft' && (
                   <>
                     <Button
                       variant="secondary"
                       size="sm"
-                      onClick={() => {
-                        setBuilderTarget(a);
-                        setShowBuilder(true);
-                      }}
+                      onClick={() => navigate(`/assessments/${a.id}/edit`)}
                     >
                       Edit
                     </Button>
@@ -607,20 +309,9 @@ export function AssessmentsPage() {
         </div>
       )}
 
-      {showBuilder && (
-        <AssessmentBuilderModal
-          initial={builderTarget && builderTarget !== 'new' ? builderTarget : null}
-          onClose={() => {
-            setShowBuilder(false);
-            setBuilderTarget(null);
-          }}
-          onSave={handleSave}
-          saving={create.isPending || update.isPending}
-        />
-      )}
-
       {assignTarget && (
         <AssignModal
+          open
           assessment={assignTarget}
           onClose={() => setAssignTarget(null)}
           onAssign={handleAssign}
@@ -628,7 +319,9 @@ export function AssessmentsPage() {
         />
       )}
 
-      {resultsId && <ResultsModal assessmentId={resultsId} onClose={() => setResultsId(null)} />}
+      {resultsId && (
+        <ResultsModal open assessmentId={resultsId} onClose={() => setResultsId(null)} />
+      )}
     </div>
   );
 }

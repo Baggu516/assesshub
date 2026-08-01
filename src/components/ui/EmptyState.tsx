@@ -14,13 +14,13 @@ export function EmptyState({
   return (
     <div
       className={clsx(
-        'flex flex-col items-center justify-center py-16 px-6 text-center',
+        'flex flex-col items-center justify-center px-6 py-16 text-center',
         className
       )}
     >
-      <div className="h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
+      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-50 to-cyan-50 ring-1 ring-brand-100 dark:from-brand-500/10 dark:to-cyan-500/10 dark:ring-brand-500/20">
         <svg
-          className="h-6 w-6 text-slate-400"
+          className="h-6 w-6 text-brand-600 dark:text-brand-300"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -33,9 +33,11 @@ export function EmptyState({
           />
         </svg>
       </div>
-      <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{title}</p>
-      {description && <p className="text-sm text-slate-500 mt-1 max-w-sm">{description}</p>}
-      {action && <div className="mt-4">{action}</div>}
+      <p className="font-display text-sm font-bold text-slate-800 dark:text-slate-100">{title}</p>
+      {description && (
+        <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-slate-500">{description}</p>
+      )}
+      {action && <div className="mt-5">{action}</div>}
     </div>
   );
 }

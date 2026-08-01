@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { Card } from '@/components/ui/Card';
+import { Button, Card, FormField, Input } from '@/components/ui';
 import {
   useTenantOrganization,
   useTenantOrganizationMutations,
@@ -69,25 +69,27 @@ export function OrganizationPage() {
           <div className="space-y-4">
             <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Details</h2>
             <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 sm:col-span-2">
-                Organization name
-                <input
+              <FormField label="Organization name" htmlFor="org-name" required className="sm:col-span-2">
+                <Input
+                  id="org-name"
                   required
-                  className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
-              </label>
-              <div>
-                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Subdomain</span>
-                <div className="mt-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 px-3 py-2 text-sm font-mono">
+              </FormField>
+              <FormField
+                label="Subdomain"
+                hint="Immutable — ties this app to its tenant database."
+              >
+                <div className="rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900/50 px-3 py-2.5 text-sm font-mono">
                   {data.subdomain}
                 </div>
-                <p className="text-xs text-slate-500 mt-1">Immutable — ties this app to its tenant database.</p>
-              </div>
-              <div>
-                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Registry status</span>
-                <div className="mt-1 flex items-center gap-2">
+              </FormField>
+              <FormField
+                label="Registry status"
+                hint="Suspended tenants cannot sign in. Managed from platform admin."
+              >
+                <div className="flex items-center gap-2 min-h-[42px]">
                   <span
                     className={
                       data.isActive
@@ -104,19 +106,15 @@ export function OrganizationPage() {
                     {data.isActive ? 'Active' : 'Suspended'}
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 mt-1">
-                  Suspended tenants cannot sign in. Managed from platform admin.
-                </p>
-              </div>
-              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 sm:col-span-2">
-                Default timezone
-                <input
-                  className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm"
+              </FormField>
+              <FormField label="Default timezone" htmlFor="org-timezone" className="sm:col-span-2">
+                <Input
+                  id="org-timezone"
                   value={timezone}
                   onChange={(e) => setTimezone(e.target.value)}
                   placeholder="e.g. UTC, America/New_York"
                 />
-              </label>
+              </FormField>
             </div>
             <div className="grid gap-2 text-xs text-slate-500 border-t border-slate-200 dark:border-slate-800 pt-4">
               <div>
@@ -139,16 +137,12 @@ export function OrganizationPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="submit"
-              disabled={save.isPending}
-              className="rounded-lg bg-indigo-600 text-white px-4 py-2 text-sm font-medium disabled:opacity-60"
-            >
+            <Button type="submit" disabled={save.isPending}>
               {save.isPending ? 'Saving…' : 'Save changes'}
-            </button>
+            </Button>
             <Link
               to="/settings"
-              className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
+              className="text-sm text-brand-600 dark:text-brand-400 hover:underline"
             >
               Sidebar labels
             </Link>
