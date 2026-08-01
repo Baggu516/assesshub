@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
@@ -20,6 +20,10 @@ import {
   type Assessment,
 } from '@/hooks/api/useAssessments';
 import { useStudentGroupsQuery } from '@/hooks/api/useStudentGroups';
+import { useAcademicYearsQuery } from '@/hooks/api/useAcademicYears';
+
+const selectClass =
+  'w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-900';
 
 function AssignModal({
   open,
@@ -31,12 +35,24 @@ function AssignModal({
   open: boolean;
   assessment: Assessment;
   onClose: () => void;
-  onAssign: (groupIds: string[], dueDate: string | null) => void;
+  onAssign: (groupIds: string[], dueDate: string | null, academicYearId: string) => void;
   saving: boolean;
 }) {
   const { data: groups = [], isLoading } = useStudentGroupsQuery();
+  const { data: years = [], isLoading: yearsLoading } = useAcademicYearsQuery();
+  const sortedYears = useMemo(
+    () => [...years].sort((a, b) => b.label.localeCompare(a.label)),
+    [years]
+  );
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [dueDate, setDueDate] = useState('');
+  const [academicYearId, setAcademicYearId] = useState('');
+
+  useEffect(() => {
+    if (academicYearId || !sortedYears.length) return;
+    const current = sortedYears.find((y) => y.isCurrent) || sortedYears[0];
+    setAcademicYearId(current.id);
+  }, [sortedYears, academicYearId]);
 
   const selectedStudentCount = useMemo(() => {
     const ids = new Set<string>();
@@ -70,8 +86,14 @@ function AssignModal({
           </Button>
           <Button
             type="button"
-            disabled={selected.size === 0 || saving}
-            onClick={() => onAssign([...selected], dueDate ? new Date(dueDate).toISOString() : null)}
+            disabled={selected.size === 0 || saving || !academicYearId}
+            onClick={() =>
+              onAssign(
+                [...selected],
+                dueDate ? new Date(dueDate).toISOString() : null,
+                academicYearId
+              )
+            }
           >
             {saving
               ? 'Assigning…'
@@ -81,6 +103,26 @@ function AssignModal({
       }
     >
       <div className="space-y-4">
+        <FormField label="Academic year" htmlFor="assign-year" hint="Students see this under that year">
+          {yearsLoading ? (
+            <Skeleton className="h-10" />
+          ) : (
+            <select
+              id="assign-year"
+              className={selectClass}
+              value={academicYearId}
+              onChange={(e) => setAcademicYearId(e.target.value)}
+            >
+              {sortedYears.map((y) => (
+                <option key={y.id} value={y.id}>
+                  {y.label}
+                  {y.isCurrent ? ' (current)' : ''}
+                </option>
+              ))}
+            </select>
+          )}
+        </FormField>
+
         <FormField label="Due date" htmlFor="assign-due" hint="Optional">
           <Input
             id="assign-due"
@@ -161,7 +203,20 @@ function ResultsModal({
   assessmentId: string;
   onClose: () => void;
 }) {
-  const { data, isLoading } = useAssessmentResultsQuery(assessmentId);
+  const { data: years = [] } = useAcademicYearsQuery();
+  const sortedYears = useMemo(
+    () => [...years].sort((a, b) => b.label.localeCompare(a.label)),
+    [years]
+  );
+  const [yearId, setYearId] = useState('');
+
+  useEffect(() => {
+    if (yearId || !sortedYears.length) return;
+    const current = sortedYears.find((y) => y.isCurrent) || sortedYears[0];
+    setYearId(current.id);
+  }, [sortedYears, yearId]);
+
+  const { data, isLoading } = useAssessmentResultsQuery(assessmentId, yearId || undefined);
 
   return (
     <Modal
@@ -175,28 +230,52 @@ function ResultsModal({
         </Button>
       }
     >
-      {isLoading ? (
-        <Skeleton className="h-32" />
-      ) : !data?.results.length ? (
-        <p className="text-sm text-slate-500">No assignments yet.</p>
-      ) : (
-        <div className="space-y-2">
-          {data.results.map((r) => (
-            <div
-              key={r.id}
-              className="flex items-center justify-between rounded-xl border border-slate-200/80 px-3 py-2.5 text-sm dark:border-slate-700"
+      <div className="space-y-4">
+        {sortedYears.length ? (
+          <label className="block text-xs text-slate-500 space-y-1">
+            <span>Academic year</span>
+            <select
+              className={selectClass}
+              value={yearId}
+              onChange={(e) => setYearId(e.target.value)}
             >
-              <div className="min-w-0">
-                <p className="font-medium text-slate-900 dark:text-white truncate">{r.studentLabel}</p>
-                <p className="text-xs text-slate-500 truncate">{r.studentEmail}</p>
+              {sortedYears.map((y) => (
+                <option key={y.id} value={y.id}>
+                  {y.label}
+                  {y.isCurrent ? ' (current)' : ''}
+                </option>
+              ))}
+              <option value="all">All years</option>
+            </select>
+          </label>
+        ) : null}
+
+        {isLoading || (sortedYears.length > 0 && !yearId) ? (
+          <Skeleton className="h-32" />
+        ) : !data?.results.length ? (
+          <p className="text-sm text-slate-500">No assignments for this year yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {data.results.map((r) => (
+              <div
+                key={r.id}
+                className="flex items-center justify-between rounded-xl border border-slate-200/80 px-3 py-2.5 text-sm dark:border-slate-700"
+              >
+                <div className="min-w-0">
+                  <p className="font-medium text-slate-900 dark:text-white truncate">{r.studentLabel}</p>
+                  <p className="text-xs text-slate-500 truncate">
+                    {r.studentEmail}
+                    {yearId === 'all' && r.academicYearLabel ? ` · ${r.academicYearLabel}` : ''}
+                  </p>
+                </div>
+                <Badge tone={r.status === 'submitted' ? 'success' : 'warning'}>
+                  {r.status === 'submitted' ? `${r.score}/${r.maxScore}` : 'Pending'}
+                </Badge>
               </div>
-              <Badge tone={r.status === 'submitted' ? 'success' : 'warning'}>
-                {r.status === 'submitted' ? `${r.score}/${r.maxScore}` : 'Pending'}
-              </Badge>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
     </Modal>
   );
 }
@@ -226,10 +305,14 @@ export function AssessmentsPage() {
     }
   };
 
-  const handleAssign = async (groupIds: string[], dueDate: string | null) => {
+  const handleAssign = async (
+    groupIds: string[],
+    dueDate: string | null,
+    academicYearId: string
+  ) => {
     if (!assignTarget) return;
     try {
-      await assign.mutateAsync({ id: assignTarget.id, groupIds, dueDate });
+      await assign.mutateAsync({ id: assignTarget.id, groupIds, dueDate, academicYearId });
       toast.success('Assigned to group students');
       setAssignTarget(null);
     } catch (err: unknown) {
@@ -242,7 +325,7 @@ export function AssessmentsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Assessment dashboard"
-        description="Create questions, publish assessments, and assign them to student groups."
+        description="Create questions, publish assessments, and assign them to student groups for an academic year."
         actions={
           <Button onClick={() => navigate('/assessments/new')}>New assessment</Button>
         }

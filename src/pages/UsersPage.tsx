@@ -1,5 +1,6 @@
-import { useMemo, useState, type Dispatch, type FormEvent, type SetStateAction } from 'react';
+import { useEffect, useMemo, useState, type Dispatch, type FormEvent, type SetStateAction } from 'react';
 import toast from 'react-hot-toast';
+import clsx from 'clsx';
 import { useAuth } from '@/context/AuthContext';
 import type { AuthUser } from '@/types/user';
 import { Badge } from '@/components/ui/Badge';
@@ -9,13 +10,11 @@ import { FormField } from '@/components/ui/FormField';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { PageHeader } from '@/components/ui/PageHeader';
-import { Select } from '@/components/ui/Select';
 import { PERMISSIONS } from '@/constants/permissions';
 import { formatPermissionList } from '@/constants/permissionLabels';
 import {
   ORG_LEVEL_KEYS,
   usePermissionsCatalogQuery,
-  useSubordinatesQuery,
   useUserMutations,
   useUsersQuery,
   type UserListRow,
@@ -25,7 +24,6 @@ import { isValidEmail } from '@/lib/validation';
 type MemberForm = {
   email: string;
   password: string;
-  parentUserId: string;
   firstName: string;
   lastName: string;
 };
@@ -34,9 +32,6 @@ function AddTeamMemberModal({
   open,
   member,
   setMember,
-  isAdmin,
-  subs,
-  subsLoading,
   onClose,
   onCreateUser,
   onInviteOnly,
@@ -46,9 +41,6 @@ function AddTeamMemberModal({
   open: boolean;
   member: MemberForm;
   setMember: Dispatch<SetStateAction<MemberForm>>;
-  isAdmin: boolean;
-  subs: { id: string; email: string }[];
-  subsLoading: boolean;
   onClose: () => void;
   onCreateUser: () => void;
   onInviteOnly: () => void;
@@ -56,20 +48,15 @@ function AddTeamMemberModal({
   invitePending: boolean;
 }) {
   const canCreateUser = useMemo(() => {
-    if (isAdmin && subsLoading) return false;
     return (
       isValidEmail(member.email) &&
       member.password.trim().length >= 8 &&
-      (!isAdmin || Boolean(member.parentUserId)) &&
       member.firstName.trim().length > 0 &&
       member.lastName.trim().length > 0
     );
-  }, [member, isAdmin, subsLoading]);
+  }, [member]);
 
-  const canInviteOnly = useMemo(() => {
-    if (isAdmin && subsLoading) return false;
-    return isValidEmail(member.email) && (!isAdmin || Boolean(member.parentUserId));
-  }, [member.email, member.parentUserId, isAdmin, subsLoading]);
+  const canInviteOnly = useMemo(() => isValidEmail(member.email), [member.email]);
 
   const busy = createPending || invitePending;
 
@@ -78,11 +65,7 @@ function AddTeamMemberModal({
       open={open}
       onClose={onClose}
       title="Add student"
-      description={
-        isAdmin
-          ? 'Create with a password, or send an email invite. Pick which teacher they report to.'
-          : 'Create with a password, or send an email invitation only.'
-      }
+      description="Create with a password, or send an email invite. Assign them to a class under Classes."
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>
@@ -124,24 +107,6 @@ function AddTeamMemberModal({
             onChange={(e) => setMember((m) => ({ ...m, password: e.target.value }))}
           />
         </FormField>
-        {isAdmin && (
-          <FormField label="Teacher (parent)" htmlFor="add-student-parent" required>
-            <Select
-              id="add-student-parent"
-              value={member.parentUserId}
-              onChange={(e) => setMember((m) => ({ ...m, parentUserId: e.target.value }))}
-              required
-              disabled={subsLoading}
-            >
-              <option value="">{subsLoading ? 'Loading teachers…' : 'Select teacher'}</option>
-              {subs.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.email}
-                </option>
-              ))}
-            </Select>
-          </FormField>
-        )}
         <div className="grid gap-3 sm:grid-cols-2">
           <FormField label="First name" htmlFor="add-student-first" required>
             <Input
@@ -170,8 +135,6 @@ function AddTeamMemberModal({
 function EditUserModal({
   open,
   target,
-  viewer,
-  subs,
   catalog,
   assignableKeys,
   canEditPermissionsSection,
@@ -182,7 +145,6 @@ function EditUserModal({
   open: boolean;
   target: UserListRow;
   viewer: AuthUser;
-  subs: { id: string; email: string }[];
   catalog: { key: string; label: string; description?: string }[] | undefined;
   assignableKeys: Set<string>;
   canEditPermissionsSection: boolean;
@@ -194,11 +156,8 @@ function EditUserModal({
   const [firstName, setFirstName] = useState(target.firstName ?? '');
   const [lastName, setLastName] = useState(target.lastName ?? '');
   const [isActive, setIsActive] = useState(target.isActive);
-  const [parentUserId, setParentUserId] = useState(target.parentUserId ?? '');
   const [newPassword, setNewPassword] = useState('');
   const [selected, setSelected] = useState<Set<string>>(() => new Set(target.permissions || []));
-
-  const showParentSelect = viewer.hierarchyRole === 'admin' && target.hierarchyRole === 'user';
 
   const toggle = (key: string) => {
     setSelected((prev) => {
@@ -222,7 +181,6 @@ function EditUserModal({
       isActive,
     };
     if (newPassword.trim()) body.password = newPassword.trim();
-    if (showParentSelect) body.parentUserId = parentUserId || null;
     if (canEditPermissionsSection && catalog?.length) body.permissions = [...selected];
     await onSave(body);
   };
@@ -294,22 +252,6 @@ function EditUserModal({
             onChange={(e) => setNewPassword(e.target.value)}
           />
         </FormField>
-        {showParentSelect && (
-          <FormField label="Reports to (teacher)" htmlFor="edit-student-parent">
-            <Select
-              id="edit-student-parent"
-              value={parentUserId}
-              onChange={(e) => setParentUserId(e.target.value)}
-            >
-              <option value="">No parent</option>
-              {subs.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.email}
-                </option>
-              ))}
-            </Select>
-          </FormField>
-        )}
 
         {canEditPermissionsSection && catalog && catalog.length > 0 && (
           <div className="border-t border-slate-100 pt-4 dark:border-slate-800">
@@ -349,15 +291,16 @@ function EditUserModal({
 export function UsersPage() {
   const { user } = useAuth();
   const [search, setSearch] = useState('');
-  const { data, isLoading } = useUsersQuery(search, user?.id);
-  const subs = useSubordinatesQuery(user?.hierarchyRole === 'admin', user?.id);
+  const [classTab, setClassTab] = useState<string>('all');
+  const isAdmin = user?.hierarchyRole === 'admin';
+  const isTeacher = user?.hierarchyRole === 'subordinate';
+  const { data, isLoading } = useUsersQuery(search, user?.id, isTeacher ? { limit: 100 } : undefined);
   const { data: catalog, isLoading: catalogLoading } = usePermissionsCatalogQuery();
   const { createMember, invite, updateUser } = useUserMutations();
 
   const [member, setMember] = useState<MemberForm>({
     email: '',
     password: '',
-    parentUserId: '',
     firstName: '',
     lastName: '',
   });
@@ -367,48 +310,68 @@ export function UsersPage() {
 
   const myPerms = user?.permissions as string[] | undefined;
 
-  const canManageListedUsers =
-    !!user &&
+  const canCreateStudents =
+    !!isAdmin && !!myPerms?.includes(PERMISSIONS.USER_CREATE);
+
+  const canEditStudents =
+    !!isAdmin &&
     !!myPerms?.some((p) => p === PERMISSIONS.SETTINGS_MANAGE || p === PERMISSIONS.USER_CREATE);
 
   const canEditPermissionsSection =
     !!user &&
     !catalogLoading &&
     !!catalog?.length &&
-    (user.hierarchyRole === 'subordinate' ||
-      myPerms?.includes(PERMISSIONS.SETTINGS_MANAGE) ||
-      (user.hierarchyRole === 'admin' &&
-        !!(myPerms?.includes(PERMISSIONS.USER_CREATE) || myPerms?.includes(PERMISSIONS.SUBORDINATE_CREATE))));
+    !!isAdmin &&
+    !!(myPerms?.includes(PERMISSIONS.SETTINGS_MANAGE) || myPerms?.includes(PERMISSIONS.USER_CREATE));
 
   const assignableKeySet = useMemo(() => {
-    if (!user || !catalog) return new Set<string>();
+    if (!user || !catalog || !isAdmin) return new Set<string>();
     const keys = new Set<string>();
     const my = user.permissions as string[];
     for (const row of catalog) {
-      const key = row.key;
-      if (user.hierarchyRole === 'subordinate') {
-        if (my.includes(key) && !ORG_LEVEL_KEYS.has(key)) keys.add(key);
-      } else if (user.hierarchyRole === 'admin') {
-        if (my.includes(PERMISSIONS.SETTINGS_MANAGE)) keys.add(key);
-        else if (my.includes(key)) keys.add(key);
+      if (my.includes(PERMISSIONS.SETTINGS_MANAGE)) keys.add(row.key);
+      else if (my.includes(row.key) && !ORG_LEVEL_KEYS.has(row.key)) keys.add(row.key);
+      else if (my.includes(row.key) && row.key !== PERMISSIONS.SETTINGS_MANAGE) {
+        keys.add(row.key);
       }
     }
     return keys;
-  }, [user, catalog]);
+  }, [user, catalog, isAdmin]);
 
-  /** This screen is only for line members (`user`). Never show admins/subordinates even if API/cache is stale. */
   const memberRows = useMemo(
     () => (data?.users ?? []).filter((u) => u.hierarchyRole === 'user'),
     [data?.users]
   );
 
-  const pageTitle = user?.hierarchyRole === 'admin' ? 'Students' : 'My students';
-  const pageDescription =
-    user?.hierarchyRole === 'subordinate'
-      ? 'Students you manage — only your direct reports are listed.'
-      : user?.hierarchyRole === 'admin'
-        ? 'All students in this school. Create them here, then assign them to a class under Classes.'
-        : 'Create people, send invitations, and manage access.';
+  const classTabs = useMemo(() => {
+    if (!isTeacher) return [];
+    const byId = new Map<string, { id: string; name: string; academicYear?: string; count: number }>();
+    for (const u of memberRows) {
+      for (const c of u.classes || []) {
+        const existing = byId.get(c.id);
+        if (existing) existing.count += 1;
+        else byId.set(c.id, { id: c.id, name: c.name, academicYear: c.academicYear, count: 1 });
+      }
+    }
+    return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [isTeacher, memberRows]);
+
+  useEffect(() => {
+    if (classTab === 'all') return;
+    if (!classTabs.some((c) => c.id === classTab)) setClassTab('all');
+  }, [classTab, classTabs]);
+
+  const visibleRows = useMemo(() => {
+    if (!isTeacher || classTab === 'all') return memberRows;
+    return memberRows.filter((u) => (u.classes || []).some((c) => c.id === classTab));
+  }, [isTeacher, classTab, memberRows]);
+
+  const pageTitle = isAdmin ? 'Students' : 'My students';
+  const pageDescription = isTeacher
+    ? 'Students in your classes. Admin creates accounts and assigns them under Classes.'
+    : isAdmin
+      ? 'Create students here, then assign teachers and students to classes under Classes.'
+      : 'Students in this school.';
 
   const runCreateMember = async () => {
     const email = member.email.trim();
@@ -429,28 +392,17 @@ export function UsersPage() {
       toast.error('First and last name are required');
       return;
     }
-    if (user?.hierarchyRole === 'admin' && !member.parentUserId) {
-      toast.error('Select a subordinate lead');
-      return;
-    }
     try {
-      const payload: Record<string, unknown> = {
+      const res = (await createMember.mutateAsync({
         email,
         password: pw,
         firstName: member.firstName,
         lastName: member.lastName,
-      };
-      if (user?.hierarchyRole === 'admin') {
-        payload.parentUserId = member.parentUserId;
-      }
-      const res = (await createMember.mutateAsync(payload)) as {
-        user?: unknown;
-        generatedPassword?: string;
-      };
+      })) as { user?: unknown; generatedPassword?: string };
       const gen = res?.generatedPassword;
       if (gen) toast.success(`User created. Temporary password: ${gen}`);
       else toast.success('User created');
-      setMember({ email: '', password: '', parentUserId: '', firstName: '', lastName: '' });
+      setMember({ email: '', password: '', firstName: '', lastName: '' });
       setAddModalOpen(false);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
@@ -464,19 +416,14 @@ export function UsersPage() {
       toast.error('Enter a valid email address');
       return;
     }
-    if (user?.hierarchyRole === 'admin' && !member.parentUserId) {
-      toast.error('Select a subordinate lead');
-      return;
-    }
     try {
       await invite.mutateAsync({
         email,
         firstName: member.firstName,
         lastName: member.lastName,
-        ...(user?.hierarchyRole === 'admin' ? { parentUserId: member.parentUserId } : {}),
       });
       toast.success('Invitation sent');
-      setMember({ email: '', password: '', parentUserId: '', firstName: '', lastName: '' });
+      setMember({ email: '', password: '', firstName: '', lastName: '' });
       setAddModalOpen(false);
     } catch {
       toast.error('Invite failed');
@@ -496,14 +443,11 @@ export function UsersPage() {
 
   return (
     <div className="ah-page">
-      {canManageListedUsers && user && (
+      {canCreateStudents && (
         <AddTeamMemberModal
           open={addModalOpen}
           member={member}
           setMember={setMember}
-          isAdmin={user.hierarchyRole === 'admin'}
-          subs={(subs.data || []) as { id: string; email: string }[]}
-          subsLoading={user.hierarchyRole === 'admin' && subs.isLoading}
           onClose={() => setAddModalOpen(false)}
           onCreateUser={runCreateMember}
           onInviteOnly={runInviteOnly}
@@ -512,13 +456,12 @@ export function UsersPage() {
         />
       )}
 
-      {editTarget && user && (
+      {editTarget && user && canEditStudents && (
         <EditUserModal
           key={editTarget.id}
           open={!!editTarget}
           target={editTarget}
           viewer={user}
-          subs={(subs.data || []) as { id: string; email: string }[]}
           catalog={catalog}
           assignableKeys={assignableKeySet}
           canEditPermissionsSection={canEditPermissionsSection}
@@ -533,7 +476,7 @@ export function UsersPage() {
         title={pageTitle}
         description={pageDescription}
         actions={
-          canManageListedUsers ? (
+          canCreateStudents ? (
             <Button onClick={() => setAddModalOpen(true)}>
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -545,6 +488,40 @@ export function UsersPage() {
       />
 
       <div className="ah-table-wrap">
+        {isTeacher && classTabs.length > 0 && (
+          <div className="flex gap-1 overflow-x-auto border-b border-slate-200/80 px-3 pt-3 dark:border-slate-700/80 sm:px-4">
+            <button
+              type="button"
+              onClick={() => setClassTab('all')}
+              className={clsx(
+                'shrink-0 rounded-t-lg px-3.5 py-2 text-sm font-medium transition-colors',
+                classTab === 'all'
+                  ? 'bg-white text-brand-800 shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-900 dark:text-brand-200 dark:ring-slate-700'
+                  : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+              )}
+            >
+              All
+              <span className="ml-1.5 tabular-nums text-xs opacity-60">{memberRows.length}</span>
+            </button>
+            {classTabs.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setClassTab(c.id)}
+                className={clsx(
+                  'shrink-0 rounded-t-lg px-3.5 py-2 text-sm font-medium transition-colors',
+                  classTab === c.id
+                    ? 'bg-white text-brand-800 shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-900 dark:text-brand-200 dark:ring-slate-700'
+                    : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+                )}
+              >
+                {c.name}
+                <span className="ml-1.5 tabular-nums text-xs opacity-60">{c.count}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="border-b border-slate-200/80 p-4 dark:border-slate-700/80 sm:px-5">
           <div className="relative max-w-md">
             <svg
@@ -563,7 +540,7 @@ export function UsersPage() {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by email or name…"
+              placeholder={isTeacher ? 'Search by name, email, or class…' : 'Search by email or name…'}
               className="pl-10"
               inputSize="sm"
             />
@@ -589,20 +566,34 @@ export function UsersPage() {
           ) : memberRows.length === 0 && !search.trim() ? (
             <EmptyState
               title="No students yet"
-              description="Add a student to get started."
+              description={
+                isTeacher
+                  ? 'No students in your classes yet. Ask admin to enroll them under Classes.'
+                  : 'Add a student, then assign them to a class.'
+              }
               action={
-                canManageListedUsers ? (
+                canCreateStudents ? (
                   <Button onClick={() => setAddModalOpen(true)}>Add student</Button>
                 ) : undefined
               }
             />
-          ) : memberRows.length === 0 ? (
+          ) : visibleRows.length === 0 ? (
             <EmptyState
               title="No matches"
-              description="Try a different search term."
+              description={
+                classTab !== 'all'
+                  ? 'No students in this class match your search.'
+                  : 'Try a different search term.'
+              }
               action={
-                <Button variant="secondary" onClick={() => setSearch('')}>
-                  Clear search
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setSearch('');
+                    setClassTab('all');
+                  }}
+                >
+                  Clear filters
                 </Button>
               }
             />
@@ -611,14 +602,15 @@ export function UsersPage() {
               <thead>
                 <tr>
                   <th>Student</th>
+                  {isTeacher && classTab === 'all' && <th>Classes</th>}
                   <th>Role</th>
                   <th>Status</th>
-                  <th>Permissions</th>
-                  {canManageListedUsers && <th className="text-right">Actions</th>}
+                  {!isTeacher && <th>Permissions</th>}
+                  {canEditStudents && <th className="text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody>
-                {memberRows.map((u: UserListRow) => {
+                {visibleRows.map((u: UserListRow) => {
                   const name = [u.firstName, u.lastName].filter(Boolean).join(' ');
                   const initials = name
                     ? name
@@ -647,6 +639,24 @@ export function UsersPage() {
                           </div>
                         </div>
                       </td>
+                      {isTeacher && classTab === 'all' && (
+                        <td>
+                          {u.classes?.length ? (
+                            <div className="flex flex-wrap gap-1.5">
+                              {u.classes.map((c) => (
+                                <Badge key={c.id} tone="brand">
+                                  {c.name}
+                                  {c.academicYear ? (
+                                    <span className="font-normal opacity-70"> · {c.academicYear}</span>
+                                  ) : null}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-slate-400">No class</span>
+                          )}
+                        </td>
+                      )}
                       <td>
                         <Badge tone="info">Student</Badge>
                       </td>
@@ -658,10 +668,12 @@ export function UsersPage() {
                           {u.isActive ? 'Active' : 'Disabled'}
                         </Badge>
                       </td>
-                      <td className="max-w-xs text-xs text-slate-600 dark:text-slate-400">
-                        <span className="line-clamp-2">{formatPermissionList(u.permissions)}</span>
-                      </td>
-                      {canManageListedUsers && (
+                      {!isTeacher && (
+                        <td className="max-w-xs text-xs text-slate-600 dark:text-slate-400">
+                          <span className="line-clamp-2">{formatPermissionList(u.permissions)}</span>
+                        </td>
+                      )}
+                      {canEditStudents && (
                         <td className="whitespace-nowrap text-right">
                           <Button variant="secondary" size="sm" onClick={() => setEditTarget(u)}>
                             Edit

@@ -201,13 +201,13 @@ export function AppLayout() {
         label: resolveNavLabel('/users', user?.hierarchyRole, sidebarLabels),
         show:
           !!user &&
-          (user.hierarchyRole === 'admin' || isTeacher) &&
-          can(user.permissions, PERMISSIONS.USER_CREATE),
+          ((user.hierarchyRole === 'admin' && can(user.permissions, PERMISSIONS.USER_CREATE)) ||
+            (isTeacher && can(user.permissions, PERMISSIONS.ASSESSMENT_CREATE))),
       },
       {
         to: '/group-students',
         label: resolveNavLabel('/group-students', user?.hierarchyRole, sidebarLabels),
-        show: !!user && isTeacher && can(user.permissions, PERMISSIONS.USER_CREATE),
+        show: !!user && isTeacher && can(user.permissions, PERMISSIONS.ASSESSMENT_CREATE),
       },
       {
         to: '/assessments',

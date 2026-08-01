@@ -36,6 +36,7 @@ export interface AssessmentAssignee {
   email: string;
   label: string;
   hierarchyRole: string;
+  classes?: { id: string; name: string; academicYear?: string }[];
 }
 
 export interface AssessmentAssignment {
@@ -43,6 +44,8 @@ export interface AssessmentAssignment {
   assessmentId: string;
   studentId: string;
   assignedBy: string;
+  academicYearId?: string | null;
+  academicYearLabel?: string | null;
   dueDate?: string | null;
   status: 'pending' | 'submitted';
   submittedAt?: string | null;
@@ -95,14 +98,18 @@ export function useAssessmentAssigneesQuery(enabled = true) {
   });
 }
 
-export function useMyAssignmentsQuery() {
+/** academicYearId: specific id, "all", or omit for current year */
+export function useMyAssignmentsQuery(academicYearId?: string) {
   return useQuery({
-    queryKey: ['assessments', 'assignments', 'my'],
+    queryKey: ['assessments', 'assignments', 'my', academicYearId ?? 'current'],
     queryFn: async () => {
-      const { data } = await api.get<{ assignments: AssessmentAssignment[] }>(
-        '/assessments/assignments/my'
-      );
-      return data.assignments;
+      const { data } = await api.get<{
+        assignments: AssessmentAssignment[];
+        academicYear: { id: string; label: string; isCurrent: boolean } | null;
+      }>('/assessments/assignments/my', {
+        params: academicYearId ? { academicYearId } : undefined,
+      });
+      return data;
     },
   });
 }
@@ -120,15 +127,18 @@ export function useAssignmentQuery(assignmentId: string | undefined) {
   });
 }
 
-export function useAssessmentResultsQuery(assessmentId: string | undefined) {
+export function useAssessmentResultsQuery(assessmentId: string | undefined, academicYearId?: string) {
   return useQuery({
-    queryKey: ['assessments', assessmentId, 'results'],
+    queryKey: ['assessments', assessmentId, 'results', academicYearId ?? 'current'],
     enabled: Boolean(assessmentId),
     queryFn: async () => {
       const { data } = await api.get<{
         assessment: Assessment;
+        academicYear: { id: string; label: string; isCurrent: boolean } | null;
         results: AssessmentAssignment[];
-      }>(`/assessments/${assessmentId}/results`);
+      }>(`/assessments/${assessmentId}/results`, {
+        params: academicYearId ? { academicYearId } : undefined,
+      });
       return data;
     },
   });
@@ -179,11 +189,13 @@ export function useAssessmentMutations() {
       studentIds,
       groupIds,
       dueDate,
+      academicYearId,
     }: {
       id: string;
       studentIds?: string[];
       groupIds?: string[];
       dueDate?: string | null;
+      academicYearId?: string;
     }) => {
       const { data } = await api.post<{ assignments: AssessmentAssignment[] }>(
         `/assessments/${id}/assign`,
@@ -191,6 +203,7 @@ export function useAssessmentMutations() {
           studentIds: studentIds || [],
           groupIds: groupIds || [],
           dueDate: dueDate || null,
+          academicYearId: academicYearId || undefined,
         }
       );
       return data.assignments;
@@ -198,6 +211,7 @@ export function useAssessmentMutations() {
     onSuccess: () => {
       invalidate();
       qc.invalidateQueries({ queryKey: ['assessments', 'assignments'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 
@@ -218,6 +232,7 @@ export function useAssessmentMutations() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['assessments', 'assignments'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 

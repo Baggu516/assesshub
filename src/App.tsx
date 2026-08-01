@@ -82,7 +82,7 @@ export default function App() {
           path="users"
           element={
             <RequireHierarchy roles={['admin', 'subordinate']}>
-              <RequirePermission keys={[PERMISSIONS.USER_CREATE]}>
+              <RequirePermission keys={[PERMISSIONS.USER_CREATE, PERMISSIONS.ASSESSMENT_CREATE]}>
                 <UsersPage />
               </RequirePermission>
             </RequireHierarchy>
@@ -158,7 +158,7 @@ export default function App() {
           path="group-students"
           element={
             <RequireHierarchy roles={['subordinate']}>
-              <RequirePermission keys={[PERMISSIONS.USER_CREATE]}>
+              <RequirePermission keys={[PERMISSIONS.ASSESSMENT_CREATE]}>
                 <GroupStudentsPage />
               </RequirePermission>
             </RequireHierarchy>

@@ -126,16 +126,20 @@ export function SettingsPage() {
               <FormField label="Students (admin)" htmlFor="nav-users">
                 <Input
                   id="nav-users"
-                  placeholder="Users"
+                  placeholder="Students"
                   value={navUsers}
                   onChange={(e) => setNavUsers(e.target.value)}
                   maxLength={48}
                 />
               </FormField>
-              <FormField label="Students (teacher)" htmlFor="nav-users-member">
+              <FormField
+                label="Students (teacher)"
+                htmlFor="nav-users-member"
+                hint="Shown to teachers — view-only list of class students."
+              >
                 <Input
                   id="nav-users-member"
-                  placeholder="People"
+                  placeholder="My students"
                   value={navUsersMember}
                   onChange={(e) => setNavUsersMember(e.target.value)}
                   maxLength={48}

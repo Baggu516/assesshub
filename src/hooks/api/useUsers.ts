@@ -10,6 +10,8 @@ export interface UserListRow {
   lastName?: string;
   permissions?: string[];
   parentUserId?: string | null;
+  /** Present for teachers — classes they share with this student */
+  classes?: { id: string; name: string; academicYear?: string }[];
 }
 
 /** Cannot be granted to org line members by a lead (must match backend `ORG_LEVEL_PERMISSION_KEYS`). */
@@ -45,13 +47,18 @@ export function useSubordinatesQuery(enabled = true, viewerUserId?: string) {
 }
 
 /** Include `viewerUserId` in the key so lists never bleed across accounts (e.g. admin cache vs subordinate). */
-export function useUsersQuery(search: string, viewerUserId: string | undefined) {
+export function useUsersQuery(
+  search: string,
+  viewerUserId: string | undefined,
+  opts?: { limit?: number }
+) {
+  const limit = opts?.limit;
   return useQuery({
-    queryKey: ['users', search, viewerUserId],
+    queryKey: ['users', search, viewerUserId, limit],
     enabled: Boolean(viewerUserId),
     queryFn: async () => {
       const { data } = await api.get<{ users: UserListRow[]; total: number }>('/users', {
-        params: { search },
+        params: { search, ...(limit ? { limit } : {}) },
       });
       return data;
     },

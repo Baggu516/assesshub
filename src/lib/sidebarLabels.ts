@@ -26,7 +26,7 @@ const FALLBACK = {
   dashboard: 'Dashboard',
   subordinates: 'Teachers',
   users: 'Students',
-  usersMember: 'Students',
+  usersMember: 'My students',
   profile: 'Profile',
   organization: 'Organization',
   settingsNav: 'Settings',

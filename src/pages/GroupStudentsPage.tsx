@@ -1,11 +1,22 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import toast from 'react-hot-toast';
-import { Card } from '@/components/ui/Card';
-import { PageHeader } from '@/components/ui/PageHeader';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
-import { Skeleton } from '@/components/ui/Spinner';
-import { useAssessmentAssigneesQuery } from '@/hooks/api/useAssessments';
+import clsx from 'clsx';
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  FormField,
+  Input,
+  Modal,
+  PageHeader,
+  Skeleton,
+  Textarea,
+} from '@/components/ui';
+import {
+  useAssessmentAssigneesQuery,
+  type AssessmentAssignee,
+} from '@/hooks/api/useAssessments';
 import {
   useStudentGroupsQuery,
   useStudentGroupMutations,
@@ -13,11 +24,13 @@ import {
 } from '@/hooks/api/useStudentGroups';
 
 function GroupFormModal({
+  open,
   initial,
   onClose,
   onSave,
   saving,
 }: {
+  open: boolean;
   initial?: StudentGroup | null;
   onClose: () => void;
   onSave: (data: { name: string; description: string; studentIds: string[] }) => void;
@@ -29,12 +42,51 @@ function GroupFormModal({
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set(initial?.studentIds || [])
   );
+  const [classTab, setClassTab] = useState('all');
+
+  const classTabs = useMemo(() => {
+    const byId = new Map<string, { id: string; name: string; count: number }>();
+    for (const s of students) {
+      for (const c of s.classes || []) {
+        const existing = byId.get(c.id);
+        if (existing) existing.count += 1;
+        else byId.set(c.id, { id: c.id, name: c.name, count: 1 });
+      }
+    }
+    return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [students]);
+
+  useEffect(() => {
+    if (classTab === 'all') return;
+    if (!classTabs.some((c) => c.id === classTab)) setClassTab('all');
+  }, [classTab, classTabs]);
+
+  const visibleStudents = useMemo(() => {
+    if (classTab === 'all') return students;
+    return students.filter((s) => (s.classes || []).some((c) => c.id === classTab));
+  }, [students, classTab]);
 
   const toggle = (id: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      return next;
+    });
+  };
+
+  const selectVisible = () => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const s of visibleStudents) next.add(s.id);
+      return next;
+    });
+  };
+
+  const clearVisible = () => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const s of visibleStudents) next.delete(s.id);
       return next;
     });
   };
@@ -52,68 +104,171 @@ function GroupFormModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" role="dialog">
-      <Card className="max-w-lg w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
-              {initial ? 'Edit group' : 'Create student group'}
-            </h3>
-            <p className="text-xs text-slate-500 mt-1">
-              Add students to a group. Assign assessments to the whole group at once.
-            </p>
-          </div>
-          <button type="button" onClick={onClose} className="text-slate-500 hover:text-slate-800 text-sm">
-            Close
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-          <input
-            placeholder="Group name *"
-            className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm"
+    <Modal
+      open={open}
+      onClose={onClose}
+      size="lg"
+      title={initial ? 'Edit group' : 'Create student group'}
+      description="Add students to a group. Assign assessments to the whole group at once."
+      footer={
+        <>
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="student-group-form" disabled={!canSave || saving}>
+            {saving ? 'Saving…' : initial ? 'Save changes' : 'Create group'}
+          </Button>
+        </>
+      }
+    >
+      <form id="student-group-form" onSubmit={handleSubmit} className="space-y-4">
+        <FormField label="Group name" htmlFor="group-name" required>
+          <Input
+            id="group-name"
+            placeholder="e.g. Quiz batch A"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            autoFocus
           />
-          <textarea
-            placeholder="Description (optional)"
-            className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm min-h-[60px]"
+        </FormField>
+        <FormField label="Description" htmlFor="group-description" hint="Optional">
+          <Textarea
+            id="group-description"
+            placeholder="What this group is for…"
+            className="min-h-[64px] rounded-xl"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
+        </FormField>
 
-          <div>
-            <p className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">
-              Students * ({selected.size} selected)
+        <div>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
+              Students <span className="text-rose-500">*</span>
+              <span className="ml-1 font-normal text-slate-400">({selected.size} selected)</span>
             </p>
-            {isLoading ? (
-              <Skeleton className="h-24" />
-            ) : students.length === 0 ? (
-              <p className="text-sm text-slate-500">No students available. Create students first.</p>
-            ) : (
-              <div className="space-y-2 max-h-52 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-700 p-3">
-                {students.map((s) => (
-                  <label key={s.id} className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} />
-                    <span>{s.label}</span>
-                    <span className="text-xs text-slate-400">{s.email}</span>
-                  </label>
-                ))}
+            {visibleStudents.length > 0 && (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={selectVisible}
+                  className="text-xs font-medium text-brand-600 hover:underline dark:text-brand-400"
+                >
+                  Select {classTab === 'all' ? 'all' : 'class'}
+                </button>
+                <button
+                  type="button"
+                  onClick={clearVisible}
+                  className="text-xs font-medium text-slate-500 hover:underline"
+                >
+                  Clear
+                </button>
               </div>
             )}
           </div>
 
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="secondary" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={!canSave || saving}>
-              {saving ? 'Saving…' : initial ? 'Save changes' : 'Create group'}
-            </Button>
-          </div>
-        </form>
-      </Card>
-    </div>
+          {classTabs.length > 0 && (
+            <div className="mb-2 flex gap-1 overflow-x-auto">
+              <button
+                type="button"
+                onClick={() => setClassTab('all')}
+                className={clsx(
+                  'shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors',
+                  classTab === 'all'
+                    ? 'bg-brand-50 text-brand-800 dark:bg-brand-500/15 dark:text-brand-200'
+                    : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'
+                )}
+              >
+                All ({students.length})
+              </button>
+              {classTabs.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setClassTab(c.id)}
+                  className={clsx(
+                    'shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors',
+                    classTab === c.id
+                      ? 'bg-brand-50 text-brand-800 dark:bg-brand-500/15 dark:text-brand-200'
+                      : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  )}
+                >
+                  {c.name} ({c.count})
+                </button>
+              ))}
+            </div>
+          )}
+
+          {isLoading ? (
+            <Skeleton className="h-24" />
+          ) : students.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-slate-200 px-3 py-4 text-sm text-slate-500 dark:border-slate-700">
+              No students in your classes yet. Ask admin to enroll them under Classes.
+            </p>
+          ) : visibleStudents.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-slate-200 px-3 py-4 text-sm text-slate-500 dark:border-slate-700">
+              No students in this class.
+            </p>
+          ) : (
+            <div className="max-h-56 space-y-1.5 overflow-y-auto rounded-xl border border-slate-200 p-2 dark:border-slate-700">
+              {visibleStudents.map((s: AssessmentAssignee) => {
+                const checked = selected.has(s.id);
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => toggle(s.id)}
+                    className={clsx(
+                      'flex w-full items-start gap-3 rounded-lg border px-2.5 py-2 text-left transition-colors',
+                      checked
+                        ? 'border-brand-400 bg-brand-50/70 dark:border-brand-500/40 dark:bg-brand-500/10'
+                        : 'border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                    )}
+                  >
+                    <span
+                      className={clsx(
+                        'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border-2',
+                        checked
+                          ? 'border-brand-600 bg-brand-600 text-white'
+                          : 'border-slate-300 dark:border-slate-500'
+                      )}
+                      aria-hidden
+                    >
+                      {checked && (
+                        <svg className="h-2.5 w-2.5" viewBox="0 0 12 12" fill="none">
+                          <path
+                            d="M2 6l3 3 5-5"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium text-slate-900 dark:text-white">
+                        {s.label}
+                      </span>
+                      <span className="block text-xs text-slate-500">{s.email}</span>
+                      {classTab === 'all' && (s.classes?.length ?? 0) > 0 && (
+                        <span className="mt-1 flex flex-wrap gap-1">
+                          {s.classes!.map((c) => (
+                            <Badge key={c.id} tone="brand" className="!py-0.5 !text-[10px]">
+                              {c.name}
+                            </Badge>
+                          ))}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </form>
+    </Modal>
   );
 }
 
@@ -179,26 +334,41 @@ export function GroupStudentsPage() {
           <Skeleton className="h-20" />
         </div>
       ) : sortedGroups.length === 0 ? (
-        <Card className="p-8 text-center text-sm text-slate-500">
-          No groups yet. Create a group and add students to assign assessments in bulk.
+        <Card className="p-0">
+          <EmptyState
+            title="No groups yet"
+            description="Create a group and add students to assign assessments in bulk."
+            action={
+              <Button
+                onClick={() => {
+                  setEditTarget(null);
+                  setShowForm(true);
+                }}
+              >
+                New group
+              </Button>
+            }
+          />
         </Card>
       ) : (
         <div className="space-y-3">
           {sortedGroups.map((g) => (
-            <Card key={g.id} className="p-4 flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+            <Card key={g.id} className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-medium text-slate-900 dark:text-white">{g.name}</h3>
-                  <Badge tone="info">{g.memberCount} student{g.memberCount !== 1 ? 's' : ''}</Badge>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-semibold text-slate-900 dark:text-white">{g.name}</h3>
+                  <Badge tone="info">
+                    {g.memberCount} student{g.memberCount !== 1 ? 's' : ''}
+                  </Badge>
                 </div>
-                {g.description && <p className="text-xs text-slate-500 mt-1">{g.description}</p>}
+                {g.description && <p className="mt-1 text-xs text-slate-500">{g.description}</p>}
                 {g.members && g.members.length > 0 && (
-                  <p className="text-xs text-slate-500 mt-2">
+                  <p className="mt-2 text-xs text-slate-500">
                     {g.members.map((m) => m.label).join(', ')}
                   </p>
                 )}
               </div>
-              <div className="flex flex-wrap gap-2 shrink-0">
+              <div className="flex shrink-0 flex-wrap gap-2">
                 <Button
                   variant="secondary"
                   size="sm"
@@ -220,6 +390,7 @@ export function GroupStudentsPage() {
 
       {showForm && (
         <GroupFormModal
+          open
           initial={editTarget}
           onClose={() => {
             setShowForm(false);
