@@ -3,22 +3,7 @@ import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
 import { useTenant } from '@/context/TenantContext';
-import { Button, FormField, Input } from '@/components/ui';
-
-const HIGHLIGHTS = [
-  {
-    title: 'Year-aware classes',
-    body: 'Enrollments stay with each academic year — promotions keep history intact.',
-  },
-  {
-    title: 'Quizzes that travel with the class',
-    body: 'Teachers assign assessments; students see work for the year they’re in.',
-  },
-  {
-    title: 'One hub for the whole school',
-    body: 'Admins, teachers, and students share the same clear workflow.',
-  },
-];
+import { Button, Input } from '@/components/ui';
 
 export function LoginPage() {
   const { login } = useAuth();
@@ -46,148 +31,131 @@ export function LoginPage() {
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-2">
-      {/* Brand / product panel */}
-      <aside className="relative flex flex-col justify-between overflow-hidden bg-gradient-to-br from-brand-900 via-brand-800 to-teal-700 px-8 py-10 text-white sm:px-12 lg:min-h-screen lg:px-14 lg:py-14">
+      {/* Brand panel — quiet atmosphere, brand as the hero */}
+      <aside className="relative flex min-h-[42vh] flex-col justify-end overflow-hidden bg-brand-800 px-8 pb-12 pt-10 sm:px-12 lg:min-h-screen lg:justify-between lg:px-16 lg:pb-16 lg:pt-14">
         <div
-          className="pointer-events-none absolute inset-0 opacity-40"
+          className="pointer-events-none absolute inset-0"
           style={{
-            backgroundImage:
-              'radial-gradient(ellipse 70% 50% at 15% 20%, rgb(45 212 191 / 0.35), transparent 55%), radial-gradient(ellipse 50% 40% at 90% 80%, rgb(8 145 178 / 0.3), transparent 50%)',
+            background:
+              'radial-gradient(ellipse 90% 70% at 0% 100%, rgb(45 212 191 / 0.28), transparent 55%), radial-gradient(ellipse 60% 50% at 100% 0%, rgb(15 118 110 / 0.55), transparent 50%), linear-gradient(165deg, #0f766e 0%, #134e4a 55%, #0b3d3a 100%)',
           }}
           aria-hidden
         />
+        {/* Soft drifting light */}
         <div
-          className="pointer-events-none absolute inset-0 opacity-[0.07]"
-          style={{
-            backgroundImage:
-              'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'1\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")',
-          }}
-          aria-hidden
-        />
-
-        {/* Soft floating shapes */}
-        <div
-          className="pointer-events-none absolute -right-16 top-24 h-56 w-56 rounded-full border border-white/10 animate-[fade-in_1.2s_ease-out_both]"
+          className="pointer-events-none absolute -left-1/4 top-1/3 h-[28rem] w-[28rem] rounded-full bg-teal-300/20 blur-3xl motion-safe:animate-[fade-in_1.6s_ease-out_both]"
           aria-hidden
         />
         <div
-          className="pointer-events-none absolute -right-8 top-32 h-40 w-40 rounded-full bg-white/5 animate-[fade-in_1.4s_ease-out_both]"
-          aria-hidden
-        />
-        <div
-          className="pointer-events-none absolute bottom-20 left-10 h-24 w-24 rounded-2xl border border-teal-300/20 bg-teal-400/10 rotate-12 animate-[fade-up_0.8s_ease-out_0.2s_both]"
+          className="pointer-events-none absolute -right-1/4 bottom-0 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl motion-safe:animate-[fade-in_2s_ease-out_0.2s_both]"
           aria-hidden
         />
 
         <div className="relative z-10 animate-fade-up">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/25 backdrop-blur-sm">
-              <span className="font-display text-lg font-bold tracking-tight">A</span>
-            </div>
-            <p className="font-display text-2xl font-bold tracking-tight sm:text-3xl">AssessHub</p>
-          </div>
-
-          <h1 className="mt-10 max-w-md font-display text-3xl font-bold leading-tight tracking-tight sm:text-4xl lg:mt-16 lg:text-[2.65rem] lg:leading-[1.15]">
-            Assessment platform for schools
-          </h1>
-          <p className="mt-4 max-w-sm text-base leading-relaxed text-teal-50/85 sm:text-lg">
-            Run classes by academic year, promote students cleanly, and assign quizzes that stay
-            tied to the right year.
+          <p className="font-display text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl">
+            AssessHub
+          </p>
+          <p className="mt-5 max-w-[14rem] text-lg leading-snug text-white/90 sm:max-w-none sm:text-xl">
+            Assessment for schools
+          </p>
+          <p className="mt-3 max-w-[16rem] text-sm leading-relaxed text-teal-100/55">
+            AI that helps teachers teach and students learn
           </p>
         </div>
 
-        <ul className="relative z-10 mt-12 hidden space-y-6 lg:mt-0 lg:block">
-          {HIGHLIGHTS.map((item, i) => (
-            <li
-              key={item.title}
-              className="animate-fade-up max-w-md"
-              style={{ animationDelay: `${0.15 + i * 0.08}s` }}
-            >
-              <p className="font-display text-sm font-semibold tracking-tight text-white">
-                {item.title}
-              </p>
-              <p className="mt-1 text-sm leading-relaxed text-teal-100/75">{item.body}</p>
-            </li>
-          ))}
-        </ul>
-
-        <p className="relative z-10 mt-10 text-xs text-teal-100/50 lg:mt-0">
-          Built for teachers, students, and school admins.
+        <p className="relative z-10 mt-10 hidden text-sm text-teal-100/45 animate-[fade-in_0.8s_ease-out_0.35s_both] lg:mt-0 lg:block">
+          Teachers · Students · Admins
         </p>
       </aside>
 
-      {/* Sign-in panel */}
-      <main className="relative flex flex-col justify-center bg-[rgb(var(--surface))] px-6 py-12 sm:px-10 lg:px-16 xl:px-24">
-        <div className="pointer-events-none absolute inset-0 bg-mesh-light dark:bg-mesh-dark opacity-60" aria-hidden />
+      {/* Sign-in */}
+      <main className="relative flex flex-col justify-center overflow-hidden bg-[rgb(var(--surface))] px-6 py-16 sm:px-12 lg:px-20 xl:px-28">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-70 dark:opacity-100"
+          style={{
+            background:
+              'radial-gradient(ellipse 70% 50% at 80% 20%, rgb(20 184 166 / 0.07), transparent 55%), radial-gradient(ellipse 50% 40% at 10% 90%, rgb(14 165 233 / 0.05), transparent 50%)',
+          }}
+          aria-hidden
+        />
 
-        <div className="relative z-10 mx-auto w-full max-w-md animate-fade-up">
-          <div className="lg:hidden mb-8">
-            <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-white font-display text-sm font-bold">
-              A
-            </div>
+        <div className="relative z-10 mx-auto w-full max-w-[20rem] animate-fade-up">
+          <div className="mb-12 lg:hidden">
+            <p className="font-display text-xl font-bold tracking-tight text-brand-800 dark:text-brand-300">
+              AssessHub
+            </p>
           </div>
 
-          <h2 className="font-display text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-[1.75rem]">
+          <h1 className="font-display text-[1.65rem] font-bold tracking-tight text-slate-900 dark:text-white">
             Sign in
-          </h2>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            Enter your school subdomain and account to continue.
-          </p>
+          </h1>
 
-          <form onSubmit={onSubmit} className="mt-8 space-y-4">
-            <FormField
-              label="Organization subdomain"
-              htmlFor="subdomain"
-              required
-              hint={`Matches your URL: ${subdomain || 'acme'}.assesshub.com`}
-            >
-              <Input
-                id="subdomain"
-                value={subdomain}
-                onChange={(e) => setSubdomain(e.target.value)}
-                placeholder="e.g. acme"
-                required
-              />
-            </FormField>
-            <FormField label="Email" htmlFor="email" required>
+          <form onSubmit={onSubmit} className="mt-10 space-y-6">
+            <div className="space-y-2">
+              <label htmlFor="subdomain" className="block text-[13px] text-slate-500 dark:text-slate-400">
+                School
+              </label>
+              <div className="flex overflow-hidden rounded-xl border border-slate-200 bg-white transition-colors focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/25 dark:border-slate-600 dark:bg-slate-950">
+                <Input
+                  id="subdomain"
+                  value={subdomain}
+                  onChange={(e) => setSubdomain(e.target.value)}
+                  placeholder="your-school"
+                  required
+                  className="rounded-none border-0 focus:ring-0"
+                />
+                <span className="flex shrink-0 items-center border-l border-slate-100 bg-slate-50/80 px-3 text-xs text-slate-400 dark:border-slate-700 dark:bg-slate-900/80">
+                  .assesshub.com
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="email" className="block text-[13px] text-slate-500 dark:text-slate-400">
+                Email
+              </label>
               <Input
                 id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@school.edu"
                 required
                 autoComplete="email"
               />
-            </FormField>
-            <FormField label="Password" htmlFor="password" required>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="current-password"
-                  className="pr-12"
-                />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label htmlFor="password" className="block text-[13px] text-slate-500 dark:text-slate-400">
+                  Password
+                </label>
                 <button
                   type="button"
                   onClick={() => setShowPassword((s) => !s)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md px-2 py-1 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-300"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  className="text-[12px] text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-300"
                 >
                   {showPassword ? 'Hide' : 'Show'}
                 </button>
               </div>
-            </FormField>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Signing in…' : 'Sign in'}
+              <Input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+              />
+            </div>
+
+            <Button type="submit" size="lg" className="mt-2 w-full" disabled={loading}>
+              {loading ? 'Signing in…' : 'Continue'}
             </Button>
           </form>
 
-          <p className="mt-8 text-center text-sm text-slate-500">
+          <p className="mt-14 text-center text-[13px] text-slate-400/80">
             <Link
-              className="font-medium text-brand-700 transition-colors hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
+              className="underline underline-offset-4 transition-colors hover:text-brand-700 dark:hover:text-brand-300"
               to="/platform/login"
             >
               Platform admin
