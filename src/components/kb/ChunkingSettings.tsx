@@ -1,15 +1,16 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import clsx from 'clsx';
 import { Toggle } from '@/components/ui/Toggle';
 
+export type ChunkingStrategy = 'original' | 'semantic';
+
 export type ChunkingConfig = {
-  sourceOnlyMode: boolean;
-  semanticSplitting: boolean;
+  chunkingStrategy: ChunkingStrategy;
+  chunkSize: number;
+  chunkOverlap: number;
   syntheticQuestions: boolean;
   autoSummary: boolean;
   multiHopSearch: boolean;
-  targetTokens: number;
-  overlapTokens: number;
 };
 
 type ChunkingSettingsProps = {
@@ -62,7 +63,12 @@ function SettingCard({
   disabled?: boolean;
 }) {
   return (
-    <div className="flex h-full flex-col justify-between rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-slate-700/80 dark:bg-slate-900/40">
+    <div
+      className={clsx(
+        'flex h-full flex-col justify-between rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-slate-700/80 dark:bg-slate-900/40',
+        disabled && 'opacity-60'
+      )}
+    >
       <div>
         <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{title}</h3>
         <p className="mt-1.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400">{description}</p>
@@ -77,18 +83,18 @@ function SettingCard({
 
 function TokenInput({
   label,
+  hint,
   value,
   onChange,
   min,
   max,
-  disabled,
 }: {
   label: string;
+  hint: string;
   value: number;
   onChange: (n: number) => void;
   min: number;
   max: number;
-  disabled?: boolean;
 }) {
   return (
     <label className="block flex-1">
@@ -98,28 +104,81 @@ function TokenInput({
         min={min}
         max={max}
         value={value}
-        disabled={disabled}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-900 tabular-nums focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-500/20 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+        className="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-900 tabular-nums focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
       />
+      <span className="mt-1 block text-[11px] leading-snug text-slate-500 dark:text-slate-400">{hint}</span>
     </label>
+  );
+}
+
+function StrategyOption({
+  selected,
+  onSelect,
+  title,
+  description,
+  name,
+  value,
+}: {
+  selected: boolean;
+  onSelect: () => void;
+  title: string;
+  description: string;
+  name: string;
+  value: ChunkingStrategy;
+}) {
+  return (
+    <label
+      className={clsx(
+        'flex cursor-pointer gap-3 rounded-xl border p-4 transition-colors',
+        selected
+          ? 'border-violet-400 bg-violet-50/70 ring-1 ring-violet-400/40 dark:border-violet-500/60 dark:bg-violet-950/30'
+          : 'border-slate-200/90 bg-white hover:border-slate-300 dark:border-slate-700/80 dark:bg-slate-900/40 dark:hover:border-slate-600'
+      )}
+    >
+      <input
+        type="radio"
+        name={name}
+        value={value}
+        checked={selected}
+        onChange={onSelect}
+        className="mt-1 h-4 w-4 shrink-0 border-slate-300 text-violet-600 focus:ring-violet-500"
+      />
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold text-slate-900 dark:text-white">{title}</span>
+        <span className="mt-1 block text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+          {description}
+        </span>
+      </span>
+    </label>
+  );
+}
+
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{children}</h3>
   );
 }
 
 export function ChunkingSettings({ value, onChange, enrichmentAvailable = true }: ChunkingSettingsProps) {
   const [open, setOpen] = useState(true);
-  const enrichDisabled = value.sourceOnlyMode || !enrichmentAvailable;
+  const isOriginal = value.chunkingStrategy === 'original';
+  const enrichDisabled = isOriginal || !enrichmentAvailable;
+  const sizeInvalid = !(value.chunkSize > value.chunkOverlap) || value.chunkSize < 100;
 
   const patch = (partial: Partial<ChunkingConfig>) => onChange({ ...value, ...partial });
 
-  const onSourceOnly = (checked: boolean) => {
-    onChange({
-      ...value,
-      sourceOnlyMode: checked,
-      ...(checked
-        ? { syntheticQuestions: false, autoSummary: false, semanticSplitting: false }
-        : { semanticSplitting: true }),
-    });
+  const setStrategy = (chunkingStrategy: ChunkingStrategy) => {
+    if (chunkingStrategy === 'original') {
+      onChange({
+        ...value,
+        chunkingStrategy,
+        autoSummary: false,
+        syntheticQuestions: false,
+      });
+      return;
+    }
+    onChange({ ...value, chunkingStrategy });
   };
 
   return (
@@ -137,86 +196,119 @@ export function ChunkingSettings({ value, onChange, enrichmentAvailable = true }
             Chunking settings
           </span>
           <span className="mt-0.5 block text-[11px] font-medium uppercase tracking-wide text-slate-400">
-            Configure how documents are split and processed
+            Strategy, ingestion enhancements, and retrieval — embeddings work with both strategies
           </span>
         </span>
         <Chevron open={open} />
       </button>
 
       {open && (
-        <div className="border-t border-slate-200/80 px-5 pb-5 pt-4 dark:border-slate-700/80">
-          {!enrichmentAvailable && (
-            <p className="mb-4 rounded-lg border border-amber-200/80 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
-              Set GEMINI_API_KEY or GROQ_API_KEY on the server to enable auto summary and synthetic questions.
+        <div className="space-y-6 border-t border-slate-200/80 px-5 pb-5 pt-4 dark:border-slate-700/80">
+          {/* Chunking Strategy */}
+          <div>
+            <SectionLabel>Chunking Strategy</SectionLabel>
+            <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+              Choose how documents are split. Semantic search (embeddings) is generated for both options.
             </p>
-          )}
+            <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Chunking strategy">
+              <StrategyOption
+                name="chunkingStrategy"
+                value="original"
+                selected={isOriginal}
+                onSelect={() => setStrategy('original')}
+                title="Original Chunking (Source-only)"
+                description="Preserve the original document structure. Text is split using the original paragraphs or fixed-size chunks without AI semantic grouping."
+              />
+              <StrategyOption
+                name="chunkingStrategy"
+                value="semantic"
+                selected={value.chunkingStrategy === 'semantic'}
+                onSelect={() => setStrategy('semantic')}
+                title="Semantic Chunking"
+                description="Use AI to group related sentences into meaningful chunks while respecting the configured maximum chunk size."
+              />
+            </div>
+          </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-            <SettingCard
-              title="Source-only mode"
-              description="Use original paragraphs as-is, skip generating summaries or synthetic questions."
-              checked={value.sourceOnlyMode}
-              onChange={onSourceOnly}
-            />
-            <SettingCard
-              title="Semantic splitting"
-              description="Group related sentences together instead of fixed-size splits."
-              checked={value.semanticSplitting}
-              onChange={(v) => patch({ semanticSplitting: v })}
-              disabled={value.sourceOnlyMode}
-            />
-            <SettingCard
-              title="Synthetic questions"
-              description="Generate AI question variants during ingestion to improve search accuracy."
-              checked={value.syntheticQuestions}
-              onChange={(v) => patch({ syntheticQuestions: v })}
-              disabled={enrichDisabled}
-            />
-            <SettingCard
-              title="Auto summary"
-              description="Create a high-level summary chunk for each document."
-              checked={value.autoSummary}
-              onChange={(v) => patch({ autoSummary: v })}
-              disabled={enrichDisabled}
-            />
-            <SettingCard
-              title="Multi-hop search"
-              description="Run a second search pass when initial results have low confidence."
-              checked={value.multiHopSearch}
-              onChange={(v) => patch({ multiHopSearch: v })}
-            />
-
-            <div className="flex h-full flex-col rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/40 sm:col-span-2 lg:col-span-1">
-              <div className="flex items-center gap-1.5">
-                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Chunk size</h3>
-                <span
-                  className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-500 dark:bg-slate-700"
-                  title="Target size per chunk and overlap between consecutive chunks (approximate tokens)."
-                >
-                  ?
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                Token budgets used when splitting document text.
-              </p>
-              <div className="mt-4 flex gap-3">
+          {/* Size / overlap — always available */}
+          <div>
+            <SectionLabel>Chunk size &amp; overlap</SectionLabel>
+            <div className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/40">
+              <div className="flex gap-4">
                 <TokenInput
-                  label="Target tokens"
-                  value={value.targetTokens}
-                  onChange={(n) => patch({ targetTokens: n })}
+                  label="Chunk size"
+                  hint="Maximum tokens allowed per chunk."
+                  value={value.chunkSize}
+                  onChange={(n) => patch({ chunkSize: n })}
                   min={100}
                   max={2000}
-                  disabled={value.sourceOnlyMode}
                 />
                 <TokenInput
-                  label="Overlap tokens"
-                  value={value.overlapTokens}
-                  onChange={(n) => patch({ overlapTokens: n })}
+                  label="Overlap"
+                  hint="Tokens shared between consecutive chunks to preserve context."
+                  value={value.chunkOverlap}
+                  onChange={(n) => patch({ chunkOverlap: n })}
                   min={0}
                   max={400}
-                  disabled={value.sourceOnlyMode}
                 />
               </div>
+              {sizeInvalid && (
+                <p className="mt-3 text-xs text-rose-600 dark:text-rose-400">
+                  Chunk size must be at least 100 and greater than overlap.
+                </p>
+              )}
+              <p className="mt-3 text-[11px] text-slate-500 dark:text-slate-400">
+                {isOriginal
+                  ? 'Used as the fixed chunk size when paragraphs exceed the budget.'
+                  : 'Used as the maximum token budget for each semantic chunk; overlap applies when chunks are split further.'}
+              </p>
+            </div>
+          </div>
+
+          {/* AI Ingestion Enhancements */}
+          <div>
+            <SectionLabel>AI Ingestion Enhancements</SectionLabel>
+            <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+              {isOriginal
+                ? 'Unavailable with Original Chunking (source-only). Switch to Semantic Chunking to enable.'
+                : 'Extra indexed segments created during document ingestion when an LLM is available.'}
+            </p>
+            {!enrichmentAvailable && !isOriginal && (
+              <p className="mb-3 rounded-lg border border-amber-200/80 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
+                Start Ollama and restart the backend so auto summary and synthetic questions can run locally.
+              </p>
+            )}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <SettingCard
+                title="Auto summary"
+                description="Create a high-level summary chunk for each document."
+                checked={isOriginal ? false : value.autoSummary}
+                onChange={(v) => patch({ autoSummary: v })}
+                disabled={enrichDisabled}
+              />
+              <SettingCard
+                title="Synthetic questions"
+                description="Generate AI question variants during ingestion to improve search accuracy."
+                checked={isOriginal ? false : value.syntheticQuestions}
+                onChange={(v) => patch({ syntheticQuestions: v })}
+                disabled={enrichDisabled}
+              />
+            </div>
+          </div>
+
+          {/* Retrieval Features */}
+          <div>
+            <SectionLabel>Retrieval Features</SectionLabel>
+            <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+              Applied at query time. Independent of how documents were chunked.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <SettingCard
+                title="Multi-hop search"
+                description="Run a second search pass when initial results have low confidence."
+                checked={value.multiHopSearch}
+                onChange={(v) => patch({ multiHopSearch: v })}
+              />
             </div>
           </div>
         </div>

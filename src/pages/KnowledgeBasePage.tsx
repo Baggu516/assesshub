@@ -2,12 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navigate } from 'react-router-dom';
+import clsx from 'clsx';
 import { api } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { Badge, Button, Card, EmptyState, PageHeader, Select } from '@/components/ui';
 import { ChunkingSettings, type ChunkingConfig } from '@/components/kb/ChunkingSettings';
+import { DocumentChunks } from '@/components/kb/DocumentChunks';
+import { KbQuestionsPanel } from '@/components/kb/KbQuestionsPanel';
 
-type EmbeddingProvider = 'gemini' | 'huggingface';
+type EmbeddingProvider = 'ollama';
 
 type KbConfig = ChunkingConfig & {
   embeddingProvider: EmbeddingProvider;
@@ -34,34 +37,22 @@ type KbMeta = {
 };
 
 const DEFAULT_CHUNKING: ChunkingConfig = {
-  sourceOnlyMode: false,
-  semanticSplitting: true,
+  chunkingStrategy: 'semantic',
+  chunkSize: 400,
+  chunkOverlap: 80,
   syntheticQuestions: true,
   autoSummary: true,
   multiHopSearch: true,
-  targetTokens: 400,
-  overlapTokens: 80,
 };
 
-const DEFAULT_EMBEDDING_MODEL: Record<EmbeddingProvider, string> = {
-  gemini: 'gemini-embedding-001',
-  huggingface: 'Xenova/all-MiniLM-L6-v2',
-};
-
-function defaultEmbeddingModel(
-  provider: EmbeddingProvider,
-  models: Record<EmbeddingProvider, string[]> | undefined
-): string {
-  const options = models?.[provider] ?? [];
-  const preferred = DEFAULT_EMBEDDING_MODEL[provider];
-  if (options.includes(preferred)) return preferred;
-  return options[0] ?? preferred;
-}
+const DEFAULT_EMBEDDING_MODEL = 'nomic-embed-text';
 
 export function KnowledgeBasePage() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
+  const [expandedDocId, setExpandedDocId] = useState<string | null>(null);
+  const [tab, setTab] = useState<'documents' | 'questions'>('documents');
 
   const { data, isLoading } = useQuery({
     queryKey: ['kb-config'],
@@ -87,57 +78,61 @@ export function KnowledgeBasePage() {
   });
 
   const [chunking, setChunking] = useState<ChunkingConfig>(DEFAULT_CHUNKING);
-  const [embeddingProvider, setEmbeddingProvider] = useState<EmbeddingProvider>('gemini');
-  const [embeddingModel, setEmbeddingModel] = useState('');
+  const [embeddingModel, setEmbeddingModel] = useState(DEFAULT_EMBEDDING_MODEL);
 
   useEffect(() => {
     if (data?.config) {
+      const c = data.config as ChunkingConfig & {
+        sourceOnlyMode?: boolean;
+        semanticSplitting?: boolean;
+        targetTokens?: number;
+        overlapTokens?: number;
+        chunkingStrategy?: ChunkingConfig['chunkingStrategy'];
+      };
+      const strategy: ChunkingConfig['chunkingStrategy'] =
+        c.chunkingStrategy === 'original' || c.chunkingStrategy === 'semantic'
+          ? c.chunkingStrategy
+          : c.sourceOnlyMode
+            ? 'original'
+            : c.semanticSplitting === false
+              ? 'original'
+              : 'semantic';
       setChunking({
-        sourceOnlyMode: data.config.sourceOnlyMode ?? DEFAULT_CHUNKING.sourceOnlyMode,
-        semanticSplitting: data.config.semanticSplitting ?? DEFAULT_CHUNKING.semanticSplitting,
-        syntheticQuestions: data.config.syntheticQuestions ?? DEFAULT_CHUNKING.syntheticQuestions,
-        autoSummary: data.config.autoSummary ?? DEFAULT_CHUNKING.autoSummary,
-        multiHopSearch: data.config.multiHopSearch ?? DEFAULT_CHUNKING.multiHopSearch,
-        targetTokens: data.config.targetTokens ?? DEFAULT_CHUNKING.targetTokens,
-        overlapTokens: data.config.overlapTokens ?? DEFAULT_CHUNKING.overlapTokens,
+        chunkingStrategy: strategy,
+        chunkSize: c.chunkSize ?? c.targetTokens ?? DEFAULT_CHUNKING.chunkSize,
+        chunkOverlap: c.chunkOverlap ?? c.overlapTokens ?? DEFAULT_CHUNKING.chunkOverlap,
+        syntheticQuestions: c.syntheticQuestions ?? DEFAULT_CHUNKING.syntheticQuestions,
+        autoSummary: c.autoSummary ?? DEFAULT_CHUNKING.autoSummary,
+        multiHopSearch: c.multiHopSearch ?? DEFAULT_CHUNKING.multiHopSearch,
       });
-      const allowed = data.meta.embeddingProviders;
-      const provider = allowed.includes(data.config.embeddingProvider)
-        ? data.config.embeddingProvider
-        : (allowed[0] ?? 'gemini');
-      const options = data.meta.embeddingModels[provider] ?? [];
+      const options = data.meta.embeddingModels.ollama ?? [];
       const savedModel = data.config.embeddingModel;
-      setEmbeddingProvider(provider);
-      setEmbeddingModel(
-        options.includes(savedModel) ? savedModel : defaultEmbeddingModel(provider, data.meta.embeddingModels)
-      );
+      setEmbeddingModel(options.includes(savedModel) ? savedModel : options[0] ?? DEFAULT_EMBEDDING_MODEL);
     }
   }, [data]);
 
-  const modelOptions = useMemo(() => data?.meta.embeddingModels[embeddingProvider] ?? [], [data, embeddingProvider]);
-
-  const onEmbeddingProviderChange = useCallback(
-    (provider: EmbeddingProvider) => {
-      setEmbeddingProvider(provider);
-      setEmbeddingModel(defaultEmbeddingModel(provider, data?.meta.embeddingModels));
-    },
-    [data?.meta.embeddingModels]
-  );
+  const modelOptions = useMemo(() => data?.meta.embeddingModels.ollama ?? [], [data]);
 
   const saveConfig = useMutation({
-    mutationFn: async () =>
-      api.patch('/kb/config', {
+    mutationFn: async () => {
+      if (!(chunking.chunkSize > chunking.chunkOverlap) || chunking.chunkSize < 100) {
+        throw Object.assign(new Error('Chunk size must be ≥ 100 and greater than overlap'), {
+          response: { data: { error: 'Chunk size must be ≥ 100 and greater than overlap' } },
+        });
+      }
+      return api.patch('/kb/config', {
         ...chunking,
-        embeddingProvider,
+        embeddingProvider: 'ollama',
         embeddingModel,
-      }),
+      });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['kb-config'] });
       toast.success('Knowledge base settings saved');
     },
     onError: (e: unknown) => {
-      const ax = e as { response?: { data?: { error?: string } } };
-      toast.error(ax.response?.data?.error || 'Save failed');
+      const ax = e as { response?: { data?: { error?: string } }; message?: string };
+      toast.error(ax.response?.data?.error || ax.message || 'Save failed');
     },
   });
 
@@ -162,7 +157,9 @@ export function KnowledgeBasePage() {
 
   const deleteDoc = useMutation({
     mutationFn: (id: string) => api.delete(`/kb/documents/${id}`),
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
+      if (expandedDocId === id) setExpandedDocId(null);
+      qc.removeQueries({ queryKey: ['kb-chunks', id] });
       refetchDocs();
       toast.success('Document removed');
     },
@@ -171,7 +168,8 @@ export function KnowledgeBasePage() {
 
   const reprocessDoc = useMutation({
     mutationFn: (id: string) => api.post(`/kb/documents/${id}/reprocess`),
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: ['kb-chunks', id] });
       refetchDocs();
       toast.success('Reprocessing started');
     },
@@ -216,6 +214,37 @@ export function KnowledgeBasePage() {
         description="Upload PDF, DOCX, HTML, or TXT. Documents are chunked, embedded, and used by the dashboard AI for your organization."
       />
 
+      <div className="flex gap-1 border-b border-slate-200 dark:border-slate-700">
+        <button
+          type="button"
+          onClick={() => setTab('documents')}
+          className={clsx(
+            '-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors',
+            tab === 'documents'
+              ? 'border-brand-600 text-brand-700 dark:border-brand-400 dark:text-brand-200'
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+          )}
+        >
+          Documents
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('questions')}
+          className={clsx(
+            '-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors',
+            tab === 'questions'
+              ? 'border-brand-600 text-brand-700 dark:border-brand-400 dark:text-brand-200'
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+          )}
+        >
+          Questions
+        </button>
+      </div>
+
+      {tab === 'questions' && <KbQuestionsPanel />}
+
+      {tab === 'documents' && (
+      <>
       <form
         className="space-y-6"
         onSubmit={(e) => {
@@ -232,26 +261,10 @@ export function KnowledgeBasePage() {
         <Card>
           <h2 className="text-base font-semibold text-slate-900 dark:text-white">Embedding settings</h2>
           <p className="mt-1 text-xs text-slate-500">
-            Provider and model used to vectorize chunks for search. Hugging Face runs locally on the server (no API
-            key); the first run may download the model.
+            Vectors are generated locally with Ollama. Pull the model, then save.
           </p>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div className="mt-4 max-w-md">
             <label className="block text-sm">
-              <span className="text-slate-600 dark:text-slate-400">Embedding provider</span>
-              <Select
-                value={embeddingProvider}
-                onChange={(e) => onEmbeddingProviderChange(e.target.value as EmbeddingProvider)}
-                className="mt-1"
-              >
-                {data.meta.embeddingProviders.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </Select>
-            </label>
-
-            <label className="block text-sm sm:col-span-2">
               <span className="text-slate-600 dark:text-slate-400">Embedding model</span>
               <Select
                 value={embeddingModel}
@@ -268,12 +281,20 @@ export function KnowledgeBasePage() {
           </div>
 
           <div className="mt-4">
-            <Button type="submit" disabled={saveConfig.isPending || !providers[embeddingProvider]}>
+            <Button
+              type="submit"
+              disabled={
+                saveConfig.isPending ||
+                !providers.ollama ||
+                !(chunking.chunkSize > chunking.chunkOverlap) ||
+                chunking.chunkSize < 100
+              }
+            >
               {saveConfig.isPending ? 'Saving…' : 'Save settings'}
             </Button>
-            {embeddingProvider === 'gemini' && !providers.gemini && (
+            {!providers.ollama && (
               <p className="mt-2 text-xs text-amber-600">
-                Add GEMINI_API_KEY to backend .env, restart the server, then save.
+                Start Ollama and restart the backend, then save.
               </p>
             )}
           </div>
@@ -309,47 +330,74 @@ export function KnowledgeBasePage() {
               description="Upload a file to build your organization knowledge base for AI answers."
             />
           )}
-          {docsData?.map((doc) => (
-            <li
-              key={doc.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200/80 px-3 py-3 text-sm dark:border-slate-700"
-            >
-              <div className="min-w-0 flex-1">
-                <span className="font-medium text-slate-900 dark:text-white block truncate">{doc.originalName}</span>
-                <div className="flex flex-wrap items-center gap-2 mt-1">
-                  <Badge tone="neutral">{doc.fileType.toUpperCase()}</Badge>
-                  <Badge tone={docStatusTone(doc.status)}>{doc.status}</Badge>
-                  {doc.status === 'ready' && (
-                    <span className="text-xs text-slate-500">{doc.chunkCount} chunks</span>
-                  )}
-                  {doc.status === 'failed' && doc.errorMessage && (
-                    <span className="text-xs text-rose-600 dark:text-rose-400 truncate">{doc.errorMessage}</span>
-                  )}
+          {docsData?.map((doc) => {
+            const expanded = expandedDocId === doc.id;
+            return (
+              <li
+                key={doc.id}
+                className="rounded-lg border border-slate-200/80 px-3 py-3 text-sm dark:border-slate-700"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <span className="block truncate font-medium text-slate-900 dark:text-white">
+                      {doc.originalName}
+                    </span>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <Badge tone="neutral">{doc.fileType.toUpperCase()}</Badge>
+                      <Badge tone={docStatusTone(doc.status)}>{doc.status}</Badge>
+                      {doc.status === 'ready' && (
+                        <span className="text-xs text-slate-500">{doc.chunkCount} chunks</span>
+                      )}
+                      {doc.status === 'failed' && doc.errorMessage && (
+                        <span className="truncate text-xs text-rose-600 dark:text-rose-400">
+                          {doc.errorMessage}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    {doc.status === 'ready' && doc.chunkCount > 0 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setExpandedDocId(expanded ? null : doc.id)}
+                      >
+                        {expanded ? 'Hide chunks' : 'Show chunks'}
+                      </Button>
+                    )}
+                    {(doc.status === 'ready' || doc.status === 'failed') && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => reprocessDoc.mutate(doc.id)}
+                      >
+                        Reprocess
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      variant="danger"
+                      size="sm"
+                      onClick={() => {
+                        if (window.confirm('Delete this document and all its chunks?')) {
+                          deleteDoc.mutate(doc.id);
+                        }
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </div>
                 </div>
-              </div>
-              <div className="flex gap-2 shrink-0">
-                {(doc.status === 'ready' || doc.status === 'failed') && (
-                  <Button type="button" variant="ghost" size="sm" onClick={() => reprocessDoc.mutate(doc.id)}>
-                    Reprocess
-                  </Button>
-                )}
-                <Button
-                  type="button"
-                  variant="danger"
-                  size="sm"
-                  onClick={() => {
-                    if (window.confirm('Delete this document and all its chunks?')) {
-                      deleteDoc.mutate(doc.id);
-                    }
-                  }}
-                >
-                  Delete
-                </Button>
-              </div>
-            </li>
-          ))}
+                <DocumentChunks documentId={doc.id} enabled={expanded && doc.status === 'ready'} />
+              </li>
+            );
+          })}
         </ul>
       </Card>
+      </>
+      )}
     </div>
   );
 }
