@@ -4,11 +4,8 @@ import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 import { Card, Select } from '@/components/ui';
 
-const PROVIDER_STORAGE_KEY = 'ah_dashboard_ai_provider';
 const OLLAMA_MODEL_STORAGE_KEY = 'ah_dashboard_ai_ollama_model';
 const ACTIVE_CHAT_STORAGE_KEY = 'ah_dashboard_ai_chat_id';
-
-type Provider = 'gemini' | 'groq' | 'ollama';
 
 type OllamaModelOption = { id: string; label: string; role?: string };
 
@@ -115,7 +112,6 @@ export function DashboardAiChat({
 }: DashboardAiChatProps) {
   const isWidget = variant === 'widget';
   const [providers, setProviders] = useState<ProvidersState>(null);
-  const [provider, setProvider] = useState<Provider>('ollama');
   const [ollamaModel, setOllamaModel] = useState(() => {
     if (typeof localStorage === 'undefined') return '';
     return localStorage.getItem(OLLAMA_MODEL_STORAGE_KEY) || '';
@@ -182,11 +178,6 @@ export function DashboardAiChat({
     return () => {
       cancelled = true;
     };
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem(PROVIDER_STORAGE_KEY, 'ollama');
-    setProvider('ollama');
   }, []);
 
   useEffect(() => {
