@@ -54,11 +54,11 @@ function BrandMark({ compact }: { compact?: boolean }) {
         <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-white dark:ring-slate-950" />
       </div>
       {!compact && (
-        <div className="min-w-0 leading-tight">
-          <p className="truncate font-display text-sm font-bold tracking-tight text-slate-900 dark:text-white">
+        <div className="min-w-0">
+          <p className="truncate font-display text-sm font-bold leading-snug tracking-tight text-slate-900 dark:text-white">
             AssessHub
           </p>
-          <p className="truncate text-[11px] font-medium text-slate-500">Platform console</p>
+          <p className="text-[11px] font-medium leading-normal text-slate-500">Platform console</p>
         </div>
       )}
     </div>

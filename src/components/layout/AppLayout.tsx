@@ -140,7 +140,7 @@ export function AppLayout() {
   const { data: org } = useTenantOrganization();
 
   const sidebarLabels = org?.settings?.sidebarLabels;
-  const hasAiPlan = (org?.plan ?? 'ai_dashboard') === 'ai_dashboard';
+  const hasAiPlan = org?.features?.aiDashboard ?? org?.plan === 'ai_dashboard';
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_KEY, collapsed ? '1' : '0');
@@ -459,7 +459,7 @@ export function AppLayout() {
             <Outlet />
           </div>
         </main>
-        {hasAiPlan ? <AiChatWidget /> : null}
+        {hasAiPlan && location.pathname === '/' ? <AiChatWidget /> : null}
       </div>
     </div>
   );

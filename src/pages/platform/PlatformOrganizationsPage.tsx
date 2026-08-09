@@ -10,8 +10,7 @@ import { Modal } from '@/components/ui/Modal';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Toggle } from '@/components/ui/Toggle';
 import type { AuthUser } from '@/types/user';
-
-type OrgPlan = 'assessments_only' | 'ai_dashboard';
+import type { OrgFeatures, OrgPlan } from '@/lib/sessionCache';
 
 type PlatformOrg = {
   id: string;
@@ -19,73 +18,138 @@ type PlatformOrg = {
   subdomain: string;
   isActive: boolean;
   plan?: OrgPlan;
+  features?: OrgFeatures;
   createdAt?: string;
   updatedAt?: string;
+};
+
+const defaultFeatures: OrgFeatures = {
+  aiDashboard: false,
+  aiAssessmentCreate: false,
 };
 
 const emptyCreateForm = {
   name: '',
   subdomain: '',
   isActive: true,
-  plan: 'assessments_only' as OrgPlan,
+  features: { ...defaultFeatures },
   adminEmail: '',
   adminPassword: '',
   firstName: '',
   lastName: '',
 };
 
+function resolveFeatures(org?: Pick<PlatformOrg, 'plan' | 'features'> | null): OrgFeatures {
+  if (org?.features) {
+    return {
+      aiDashboard: org.features.aiDashboard === true,
+      aiAssessmentCreate: org.features.aiAssessmentCreate === true,
+    };
+  }
+  return {
+    aiDashboard: org?.plan === 'ai_dashboard',
+    aiAssessmentCreate: false,
+  };
+}
+
 function PlanPicker({
   value,
   onChange,
 }: {
-  value: OrgPlan;
-  onChange: (plan: OrgPlan) => void;
+  value: OrgFeatures;
+  onChange: (features: OrgFeatures) => void;
 }) {
-  const aiEnabled = value === 'ai_dashboard';
+  const rows: {
+    key: keyof OrgFeatures | 'assessments';
+    title: string;
+    description: string;
+    locked?: boolean;
+  }[] = [
+    {
+      key: 'assessments',
+      title: 'Assessments',
+      description: 'Create, assign, and grade assessments',
+      locked: true,
+    },
+    {
+      key: 'aiDashboard',
+      title: 'AI on dashboard',
+      description: 'Dashboard chat assistant and knowledge base',
+    },
+    {
+      key: 'aiAssessmentCreate',
+      title: 'Create assessment with AI',
+      description: 'Generate questions and draft assessments with AI',
+    },
+  ];
 
   return (
     <div>
       <p className="ah-label mb-2">Subscription</p>
-      <div className="space-y-2 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
-        <label className="flex cursor-not-allowed items-start gap-2.5 opacity-80">
-          <input
-            type="checkbox"
-            checked
-            disabled
-            readOnly
-            className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600"
-          />
-          <span>
-            <span className="block text-sm font-medium text-slate-800 dark:text-slate-100">
-              Assessments
-            </span>
-            <span className="block text-xs text-slate-500">Always included · cannot be turned off</span>
-          </span>
-        </label>
-
-        <label className="flex cursor-pointer items-start gap-2.5">
-          <input
-            type="checkbox"
-            className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-            checked={aiEnabled}
-            onChange={(e) => onChange(e.target.checked ? 'ai_dashboard' : 'assessments_only')}
-          />
-          <span>
-            <span className="block text-sm font-medium text-slate-800 dark:text-slate-100">
-              AI on dashboard
-            </span>
-            <span className="block text-xs text-slate-500">
-              Dashboard AI chat and knowledge base
-            </span>
-          </span>
-        </label>
+      <p className="mb-3 text-xs text-slate-500">
+        Assessments are always included. Toggle AI add-ons for this organization.
+      </p>
+      <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700">
+        {rows.map((row, index) => {
+          const checked =
+            row.key === 'assessments' ? true : value[row.key as keyof OrgFeatures];
+          return (
+            <div
+              key={row.key}
+              className={
+                index === 0
+                  ? 'flex items-center justify-between gap-4 bg-slate-50/80 px-4 py-3.5 dark:bg-slate-900/40'
+                  : 'flex items-center justify-between gap-4 border-t border-slate-200 px-4 py-3.5 dark:border-slate-700'
+              }
+            >
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                    {row.title}
+                  </p>
+                  {row.locked ? (
+                    <span className="rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                      Included
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-0.5 text-xs text-slate-500">{row.description}</p>
+              </div>
+              {row.locked ? (
+                <span
+                  className="inline-flex h-7 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-300"
+                  aria-label="Always included"
+                >
+                  On
+                </span>
+              ) : (
+                <Toggle
+                  checked={checked}
+                  onChange={(next) =>
+                    onChange({
+                      ...value,
+                      [row.key]: next,
+                    })
+                  }
+                  aria-label={row.title}
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function planLabel(plan?: OrgPlan) {
-  return plan === 'ai_dashboard' ? 'AI dashboard' : 'Assessments';
+function subscriptionSummary(org: PlatformOrg) {
+  const features = resolveFeatures(org);
+  const extras: string[] = [];
+  if (features.aiDashboard) extras.push('AI dashboard');
+  if (features.aiAssessmentCreate) extras.push('AI create');
+  if (!extras.length) return { label: 'Assessments', tone: 'neutral' as const };
+  if (extras.length === 2) return { label: 'Full AI', tone: 'brand' as const };
+  return { label: extras[0], tone: 'brand' as const };
 }
 
 type CreateOrgResponse = {
@@ -137,18 +201,18 @@ function EditOrganizationModal({
   org: PlatformOrg | null;
   open: boolean;
   onClose: () => void;
-  onSave: (id: string, body: { name: string; isActive: boolean; plan: OrgPlan }) => void;
+  onSave: (id: string, body: { name: string; isActive: boolean; features: OrgFeatures }) => void;
   isPending: boolean;
 }) {
   const [name, setName] = useState('');
   const [isActive, setIsActive] = useState(true);
-  const [plan, setPlan] = useState<OrgPlan>('ai_dashboard');
+  const [features, setFeatures] = useState<OrgFeatures>(defaultFeatures);
 
   useEffect(() => {
     if (org) {
       setName(org.name);
       setIsActive(org.isActive);
-      setPlan(org.plan === 'ai_dashboard' ? 'ai_dashboard' : 'assessments_only');
+      setFeatures(resolveFeatures(org));
     }
   }, [org, open]);
 
@@ -177,7 +241,7 @@ function EditOrganizationModal({
             e.preventDefault();
             const nextName = name.trim();
             if (!nextName) return;
-            onSave(org.id, { name: nextName, isActive, plan });
+            onSave(org.id, { name: nextName, isActive, features });
             onClose();
           }}
         >
@@ -200,7 +264,7 @@ function EditOrganizationModal({
             />
           </div>
 
-          <PlanPicker value={plan} onChange={setPlan} />
+          <PlanPicker value={features} onChange={setFeatures} />
 
           <div className="flex items-center justify-between gap-4">
             <div>
@@ -239,7 +303,7 @@ function CreateOrganizationModal({
         name: form.name.trim(),
         subdomain: form.subdomain.trim().toLowerCase().replace(/[^a-z0-9-]/g, ''),
         isActive: form.isActive,
-        plan: form.plan,
+        features: form.features,
       };
       if (form.adminEmail.trim() && form.adminPassword) {
         body.adminEmail = form.adminEmail.trim().toLowerCase();
@@ -354,7 +418,10 @@ function CreateOrganizationModal({
           Active (tenant can sign in)
         </label>
 
-        <PlanPicker value={form.plan} onChange={(plan) => setForm((f) => ({ ...f, plan }))} />
+        <PlanPicker
+          value={form.features}
+          onChange={(features) => setForm((f) => ({ ...f, features }))}
+        />
 
         <div className="border-t border-slate-200 pt-4 dark:border-slate-700">
           <p className="mb-3 text-xs font-medium text-slate-600 dark:text-slate-400">Optional first admin</p>
@@ -444,7 +511,7 @@ export function PlatformOrganizationsPage() {
       body,
     }: {
       id: string;
-      body: { name?: string; isActive?: boolean; plan?: OrgPlan };
+      body: { name?: string; isActive?: boolean; features?: OrgFeatures };
     }) => {
       const { data: res } = await platformApi.patch<{ organization: PlatformOrg }>(
         `/platform/organizations/${id}`,
@@ -460,10 +527,10 @@ export function PlatformOrganizationsPage() {
     onError: () => toast.error('Update failed'),
   });
 
-  const saveOrg = (id: string, body: { name: string; isActive: boolean; plan: OrgPlan }) => {
+  const saveOrg = (id: string, body: { name: string; isActive: boolean; features: OrgFeatures }) => {
     patchMutation.mutate({
       id,
-      body: { name: body.name, isActive: body.isActive, plan: body.plan },
+      body: { name: body.name, isActive: body.isActive, features: body.features },
     });
   };
 
@@ -665,9 +732,10 @@ export function PlatformOrganizationsPage() {
                       </code>
                     </td>
                     <td>
-                      <Badge tone={org.plan === 'ai_dashboard' ? 'brand' : 'neutral'}>
-                        {planLabel(org.plan)}
-                      </Badge>
+                      {(() => {
+                        const sub = subscriptionSummary(org);
+                        return <Badge tone={sub.tone}>{sub.label}</Badge>;
+                      })()}
                     </td>
                     <td>
                       <Badge tone={org.isActive ? 'success' : 'warning'}>

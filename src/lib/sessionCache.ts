@@ -5,12 +5,18 @@ const TENANT_PREFIX = 'ah_session_tenant:';
 
 export type OrgPlan = 'assessments_only' | 'ai_dashboard';
 
+export type OrgFeatures = {
+  aiDashboard: boolean;
+  aiAssessmentCreate: boolean;
+};
+
 export type CachedTenantOrganization = {
   id: string;
   name: string;
   subdomain: string;
   isActive: boolean;
   plan?: OrgPlan;
+  features?: OrgFeatures;
   createdAt?: string;
   updatedAt?: string;
   settings?: {
