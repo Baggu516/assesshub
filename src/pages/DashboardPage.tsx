@@ -103,11 +103,14 @@ export function DashboardPage() {
           description={`Your assessments at a glance${yearHint}`}
           actions={yearPicker}
         />
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <CardStat label="Assessments created" value={data.totalAssessments} />
           <CardStat label="Published" value={data.publishedAssessments} />
-          <CardStat label="Pending submissions" value={data.pendingSubmissions} />
-          <CardStat label="Completed submissions" value={data.completedSubmissions} />
+          <CardStat
+            label="Completed"
+            value={`${data.completedAssessments} / ${data.publishedAssessments}`}
+            hint="Fully submitted · of published"
+          />
         </div>
       </div>
     );

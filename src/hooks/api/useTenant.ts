@@ -32,12 +32,12 @@ export function useTenantOrganization() {
 
   return useQuery({
     queryKey: ['tenant', subdomain],
-    enabled: Boolean(user && subdomain && !cached),
+    enabled: Boolean(user && subdomain),
     queryFn: () => fetchTenantOrganization(subdomain),
     initialData: cached ?? undefined,
-    staleTime: Infinity,
+    staleTime: 60_000,
     gcTime: Infinity,
-    refetchOnMount: false,
+    refetchOnMount: true,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });

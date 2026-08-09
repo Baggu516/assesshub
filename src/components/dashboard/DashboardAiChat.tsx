@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 import { Card, Select } from '@/components/ui';
+import { useAuth } from '@/context/AuthContext';
+import type { HierarchyRole } from '@/types/user';
 
 const OLLAMA_MODEL_STORAGE_KEY = 'ah_dashboard_ai_ollama_model';
 const ACTIVE_CHAT_STORAGE_KEY = 'ah_dashboard_ai_chat_id';
@@ -67,11 +69,29 @@ function formatMessageTime(iso?: string) {
   }
 }
 
-const EXAMPLE_PROMPTS = [
-  'What should I focus on this week?',
-  'Summarize my pending assessments.',
-  'How are student submissions trending?',
-];
+const EXAMPLE_PROMPTS_BY_ROLE: Record<HierarchyRole, string[]> = {
+  admin: [
+    'How many pending and completed submissions does each teacher have?',
+    'Which teachers have the most pending turn-ins this month?',
+    'Summarize assessment activity by teacher this year.',
+  ],
+  subordinate: [
+    'What should I focus on this week?',
+    'Which of my assessments still need turn-ins?',
+    'How are student submissions trending?',
+  ],
+  user: [
+    'What assessments do I still need to complete?',
+    'How am I doing on recent scores?',
+    'What should I focus on this week?',
+  ],
+};
+
+const EMPTY_HINT_BY_ROLE: Record<HierarchyRole, string> = {
+  admin: 'Ask about organization activity, assessments, or your knowledge base.',
+  subordinate: 'Ask about your assessments, student turn-ins, or school documents.',
+  user: 'Ask about your assigned assessments, scores, or school documents.',
+};
 
 function ChatLogoIcon({ className }: { className?: string }) {
   return (
@@ -110,6 +130,10 @@ export function DashboardAiChat({
   expanded = false,
   onToggleExpand,
 }: DashboardAiChatProps) {
+  const { user } = useAuth();
+  const role = user?.hierarchyRole ?? 'subordinate';
+  const examplePrompts = useMemo(() => EXAMPLE_PROMPTS_BY_ROLE[role], [role]);
+  const emptyHint = EMPTY_HINT_BY_ROLE[role];
   const isWidget = variant === 'widget';
   const [providers, setProviders] = useState<ProvidersState>(null);
   const [ollamaModel, setOllamaModel] = useState(() => {
@@ -632,11 +656,11 @@ export function DashboardAiChat({
                       <div className="text-center">
                         <p className="font-display text-sm font-bold text-slate-800 dark:text-slate-100">How can I help?</p>
                         <p className="mt-1 max-w-xs text-sm leading-relaxed text-slate-500">
-                          Ask about assessments, students, or your knowledge base.
+                          {emptyHint}
                         </p>
                       </div>
                       <div className="flex w-full max-w-sm flex-col gap-2">
-                        {EXAMPLE_PROMPTS.map((prompt, idx) => (
+                        {examplePrompts.map((prompt, idx) => (
                           <button
                             key={prompt}
                             type="button"
@@ -801,7 +825,7 @@ export function DashboardAiChat({
                           type="button"
                           title="Suggest prompt"
                           onClick={() => {
-                            const p = EXAMPLE_PROMPTS[Math.floor(Math.random() * EXAMPLE_PROMPTS.length)];
+                            const p = examplePrompts[Math.floor(Math.random() * examplePrompts.length)];
                             setInput(p);
                           }}
                           className="rounded-xl p-1.5 text-slate-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-300"

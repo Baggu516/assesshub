@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { clearPlatformSession, platformApi, setPlatformToken } from '@/lib/platformApi';
 import { Button } from '@/components/ui/Button';
@@ -94,6 +94,15 @@ export function PlatformLoginPage() {
             </Button>
           </form>
         </Card>
+
+        <p className="text-center text-[13px] text-slate-400/80">
+          <Link
+            className="underline underline-offset-4 transition-colors hover:text-brand-700 dark:hover:text-brand-300"
+            to="/login"
+          >
+            Back to tenant login
+          </Link>
+        </p>
       </div>
     </div>
   );

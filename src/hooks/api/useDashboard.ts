@@ -22,8 +22,8 @@ export type TeacherDashboard = {
   academicYear?: AcademicYearMeta;
   totalAssessments: number;
   publishedAssessments: number;
-  pendingSubmissions: number;
-  completedSubmissions: number;
+  /** Published assessments where every assigned student has submitted */
+  completedAssessments: number;
 };
 
 export type StudentDashboard = {

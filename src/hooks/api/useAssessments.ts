@@ -144,6 +144,35 @@ export function useAssessmentResultsQuery(assessmentId: string | undefined, acad
   });
 }
 
+export interface AssessmentAssignmentSummary {
+  academicYear: { id: string; label: string; isCurrent: boolean } | null;
+  assignedStudentIds: string[];
+  assignedGroupIds: string[];
+  assignedGroups: { id: string; name: string }[];
+  totalAssigned: number;
+  dueDate: string | null;
+}
+
+export function useAssessmentAssignmentSummaryQuery(
+  assessmentId: string | undefined,
+  academicYearId?: string,
+  enabled = true
+) {
+  return useQuery({
+    queryKey: ['assessments', assessmentId, 'assignment-summary', academicYearId ?? 'current'],
+    enabled: Boolean(assessmentId) && enabled,
+    queryFn: async () => {
+      const { data } = await api.get<AssessmentAssignmentSummary>(
+        `/assessments/${assessmentId}/assignment-summary`,
+        {
+          params: academicYearId ? { academicYearId } : undefined,
+        }
+      );
+      return data;
+    },
+  });
+}
+
 export function useAssessmentMutations() {
   const qc = useQueryClient();
 

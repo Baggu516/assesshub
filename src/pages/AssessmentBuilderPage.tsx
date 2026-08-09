@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 import {
@@ -19,6 +19,7 @@ import {
   type AssessmentQuestion,
   type QuestionType,
 } from '@/hooks/api/useAssessments';
+import type { AiAssessmentDraft } from '@/components/assessments/CreateWithAiModal';
 
 const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
   single_select: 'Single select',
@@ -305,13 +306,27 @@ export function AssessmentBuilderPage() {
   const { assessmentId } = useParams<{ assessmentId: string }>();
   const isEdit = Boolean(assessmentId);
   const navigate = useNavigate();
+  const location = useLocation();
+  const aiDraft = (location.state as { aiDraft?: AiAssessmentDraft } | null)?.aiDraft;
   const { data: existing, isLoading, isError } = useAssessmentQuery(assessmentId);
   const { create, update } = useAssessmentMutations();
 
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [questions, setQuestions] = useState<AssessmentQuestion[]>([emptyQuestion('single_select', 0)]);
+  const [title, setTitle] = useState(() => aiDraft?.title || '');
+  const [description, setDescription] = useState(() => aiDraft?.description || '');
+  const [questions, setQuestions] = useState<AssessmentQuestion[]>(() =>
+    aiDraft?.questions?.length
+      ? aiDraft.questions.map((q, i) => ({ ...q, order: i }))
+      : [emptyQuestion('single_select', 0)]
+  );
   const [hydrated, setHydrated] = useState(!isEdit);
+  const [fromAi] = useState(() => Boolean(aiDraft?.questions?.length));
+
+  useEffect(() => {
+    if (!aiDraft || isEdit) return;
+    // Clear one-shot router state so a refresh doesn't re-apply the draft.
+    navigate(location.pathname, { replace: true, state: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount when AI draft is present
+  }, []);
 
   useEffect(() => {
     if (!isEdit || !existing) return;
@@ -436,10 +451,13 @@ export function AssessmentBuilderPage() {
           Assessments
         </button>
         <PageHeader
-          title={isEdit ? 'Edit assessment' : 'Create assessment'}
-          description="Build your quiz with single-select, multi-select, or short-answer questions."
-        />
-      </div>
+          title={isEdit ? 'Edit assessment' : fromAi ? 'Review AI draft' : 'Create assessment'}
+          description={
+            fromAi
+              ? 'Review and edit the generated questions, then save as a draft.'
+              : 'Build your quiz with single-select, multi-select, or short-answer questions.'
+          }
+        />      </div>
 
       <form id="assessment-builder-form" onSubmit={handleSubmit} className="space-y-6">
         <Card className="space-y-4">
