@@ -24,6 +24,8 @@ const LOGIN_HIGHLIGHTS = [
 
 const REMEMBER_KEY = 'ah_login_remember_email';
 const REGISTER_URL = 'https://classtrio.in/#request';
+/** Same base as axios. A relative `/api` hits the frontend host, which only serves the app. */
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 
 function BrandMark({
   name,
@@ -125,7 +127,7 @@ export function LoginPage() {
     setBrandingStatus('loading');
     const timer = window.setTimeout(async () => {
       try {
-        const res = await fetch(`/api/public/tenants/${encodeURIComponent(sub)}`);
+        const res = await fetch(`${API_BASE}/public/tenants/${encodeURIComponent(sub)}`);
         if (!res.ok) {
           if (!cancelled) {
             setBranding(null);
