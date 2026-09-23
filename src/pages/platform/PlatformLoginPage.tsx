@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { clearPlatformSession, platformApi, setPlatformToken } from '@/lib/platformApi';
+import { ClassTrioMark } from '@/components/brand/ClassTrioMark';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { PasswordInput } from '@/components/ui/PasswordInput';
@@ -52,7 +53,8 @@ export function PlatformLoginPage() {
 
       <div className="relative z-10 w-full max-w-sm motion-safe:animate-rise-in">
         <div className="mb-10 text-center">
-          <p className="font-display text-3xl font-extrabold tracking-tight text-brand-800 dark:text-brand-300">
+          <ClassTrioMark className="mx-auto h-12 w-12" />
+          <p className="mt-4 font-display text-3xl font-extrabold tracking-tight text-brand-800 dark:text-brand-300">
             ClassTrio
           </p>
           <h1 className="mt-6 font-display text-2xl font-bold tracking-tight text-slate-900 dark:text-white">

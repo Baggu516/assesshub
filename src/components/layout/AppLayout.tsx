@@ -8,6 +8,7 @@ import { PERMISSIONS } from '@/constants/permissions';
 import { useTenantOrganization } from '@/hooks/api/useTenant';
 import { resolveNavLabel } from '@/lib/sidebarLabels';
 import { resolveOrgFeatures } from '@/lib/sessionCache';
+import { ClassTrioMark } from '@/components/brand/ClassTrioMark';
 import { AiChatWidget } from '@/components/dashboard/AiChatWidget';
 
 const SIDEBAR_KEY = 'ah_sidebar_collapsed';
@@ -334,16 +335,13 @@ export function AppLayout() {
               collapsed ? 'justify-center pl-0' : 'px-3'
             )}
           >
+            <ClassTrioMark className="h-8 w-8 shrink-0" />
             {!collapsed ? (
               <>
-                <span className="font-semibold text-slate-900 dark:text-white truncate">ClassTrio</span>
+                <span className="ml-2.5 font-semibold text-slate-900 dark:text-white truncate">ClassTrio</span>
                 <span className="ml-2 text-xs text-slate-500 shrink-0 hidden xl:inline">Education</span>
               </>
-            ) : (
-              <span className="font-bold text-lg text-brand-600 dark:text-brand-400" title="ClassTrio">
-                C
-              </span>
-            )}
+            ) : null}
           </div>
           <button
             type="button"

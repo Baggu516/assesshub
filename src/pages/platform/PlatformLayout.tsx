@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import { clearPlatformSession } from '@/lib/platformApi';
 import { useTheme } from '@/context/ThemeContext';
+import { ClassTrioMark } from '@/components/brand/ClassTrioMark';
 import { Button } from '@/components/ui/Button';
 
 const SIDEBAR_KEY = 'ah_platform_sidebar_collapsed';
@@ -46,13 +47,7 @@ function NavIcon({ to }: { to: string }) {
 function BrandMark({ compact }: { compact?: boolean }) {
   return (
     <div className={clsx('flex items-center gap-2.5 min-w-0', compact && 'justify-center')}>
-      <div
-        className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-cyan-600 text-white shadow-glow"
-        aria-hidden
-      >
-        <span className="font-display text-sm font-bold tracking-tight">CT</span>
-        <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-white dark:ring-slate-950" />
-      </div>
+      <ClassTrioMark className="h-9 w-9 shrink-0" />
       {!compact && (
         <div className="min-w-0">
           <p className="truncate font-display text-sm font-bold leading-snug tracking-tight text-slate-900 dark:text-white">

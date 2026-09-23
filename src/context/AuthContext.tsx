@@ -123,7 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user: AuthUser;
       }>(
         '/auth/login',
-        { email, password },
+        { identifier: email.trim(), email: email.trim(), password },
         { headers: { 'X-Tenant-Subdomain': tenant } }
       );
       setTokens(data.accessToken, data.refreshToken);

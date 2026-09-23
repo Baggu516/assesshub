@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
 import { useTenant } from '@/context/TenantContext';
+import { ForgotPasswordPanel } from '@/components/auth/ForgotPasswordPanel';
+import { ClassTrioMark } from '@/components/brand/ClassTrioMark';
 import { Button, Input, PasswordInput } from '@/components/ui';
 import { isMasterHost, isReservedSubdomain } from '@/lib/masterHost';
 
@@ -21,6 +23,7 @@ const LOGIN_HIGHLIGHTS = [
 ];
 
 const REMEMBER_KEY = 'ah_login_remember_email';
+const REGISTER_URL = 'https://classtrio.in/#request';
 
 function BrandMark({
   name,
@@ -40,20 +43,7 @@ function BrandMark({
           className={compact ? 'h-8 w-8 object-contain' : 'h-9 w-9 object-contain'}
         />
       ) : (
-        <span
-          className={`grid shrink-0 place-items-center rounded-lg bg-brand-600 font-display font-bold text-white ${
-            compact ? 'h-8 w-8 text-[10px]' : 'h-9 w-9 text-xs'
-          }`}
-          aria-hidden
-        >
-          {name
-            .split(/\s+/)
-            .filter(Boolean)
-            .slice(0, 2)
-            .map((w) => w[0])
-            .join('')
-            .toUpperCase() || 'CT'}
-        </span>
+        <ClassTrioMark className={compact ? 'h-8 w-8' : 'h-9 w-9'} />
       )}
       <span className={`font-display font-semibold tracking-tight text-slate-900 ${compact ? 'text-base' : 'text-lg'}`}>
         {name}
@@ -93,8 +83,10 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(() => !!localStorage.getItem(REMEMBER_KEY));
   const [loading, setLoading] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'forgot'>('login');
   const [branding, setBranding] = useState<TenantBranding | null>(null);
-  const [brandingError, setBrandingError] = useState<string | null>(null);
+  const [brandingStatus, setBrandingStatus] = useState<'loading' | 'ready' | 'missing' | 'error'>('loading');
+  const [lookupAttempt, setLookupAttempt] = useState(0);
 
   const masterHost = useMemo(() => isMasterHost(), []);
   const hostLockedSubdomain = useMemo(() => {
@@ -125,28 +117,35 @@ export function LoginPage() {
     const sub = hostLockedSubdomain;
     if (isMasterLogin || !sub || isReservedSubdomain(sub)) {
       setBranding(null);
-      setBrandingError(null);
+      setBrandingStatus('ready');
       return;
     }
 
     let cancelled = false;
+    setBrandingStatus('loading');
     const timer = window.setTimeout(async () => {
-      setBrandingError(null);
       try {
         const res = await fetch(`/api/public/tenants/${encodeURIComponent(sub)}`);
         if (!res.ok) {
           if (!cancelled) {
             setBranding(null);
-            setBrandingError(res.status === 404 ? 'School not found' : 'Could not load school');
+            setBrandingStatus(res.status === 404 ? 'missing' : 'error');
           }
           return;
         }
-        const data = (await res.json()) as { tenant: TenantBranding };
-        if (!cancelled) setBranding(data.tenant);
+        const data = (await res.json()) as { tenant?: TenantBranding };
+        if (cancelled) return;
+        if (!data.tenant) {
+          setBranding(null);
+          setBrandingStatus('missing');
+          return;
+        }
+        setBranding(data.tenant);
+        setBrandingStatus('ready');
       } catch {
         if (!cancelled) {
           setBranding(null);
-          setBrandingError('Could not load school');
+          setBrandingStatus('error');
         }
       }
     }, 200);
@@ -155,7 +154,7 @@ export function LoginPage() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [hostLockedSubdomain, isMasterLogin]);
+  }, [hostLockedSubdomain, isMasterLogin, lookupAttempt]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -187,6 +186,9 @@ export function LoginPage() {
   };
 
   const productName = isMasterLogin ? 'ClassTrio' : branding?.name || 'ClassTrio';
+  const schoolHost = Boolean(hostLockedSubdomain) && !isMasterLogin;
+  const schoolUnknown = schoolHost && brandingStatus !== 'ready';
+  const baseDomain = (import.meta.env.VITE_BASE_DOMAIN || 'classtrio.in').toLowerCase();
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-2">
@@ -260,6 +262,54 @@ export function LoginPage() {
             <BrandMark name={productName} logoUrl={branding?.logoUrl} compact />
           </div>
 
+          {schoolUnknown ? (
+            brandingStatus === 'loading' ? (
+              <div className="text-center">
+                <h2 className="font-serif text-3xl font-semibold tracking-tight text-slate-900 dark:text-white sm:text-[2rem]">
+                  Checking this school
+                </h2>
+                <p className="mt-3 text-sm text-slate-500">
+                  Looking up {hostLockedSubdomain}.{baseDomain}
+                </p>
+              </div>
+            ) : (
+              <div className="text-center">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-800/70 dark:text-brand-200/80">
+                  ClassTrio
+                </p>
+                <h2 className="mt-4 font-serif text-3xl font-semibold tracking-tight text-slate-900 dark:text-white sm:text-[2rem]">
+                  Not registered
+                </h2>
+                <p className="mt-4 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                  <span className="font-semibold text-slate-800 dark:text-white">
+                    {hostLockedSubdomain}.{baseDomain}
+                  </span>{' '}
+                  is not registered under ClassTrio. Please register to open this school.
+                </p>
+                <a
+                  href={REGISTER_URL}
+                  className="mt-8 inline-flex w-full items-center justify-center rounded-xl bg-brand-600 px-5 py-3.5 text-[15px] font-semibold text-white shadow-sm shadow-brand-600/20 transition hover:bg-brand-500"
+                >
+                  Register
+                </a>
+                {brandingStatus === 'error' ? (
+                  <button
+                    type="button"
+                    onClick={() => setLookupAttempt((n) => n + 1)}
+                    className="mt-4 text-sm font-semibold text-brand-700 hover:text-brand-600 dark:text-brand-300"
+                  >
+                    Try again
+                  </button>
+                ) : null}
+              </div>
+            )
+          ) : authMode === 'forgot' ? (
+            <ForgotPasswordPanel
+              tenant={hostLockedSubdomain || subdomain}
+              onBack={() => setAuthMode('login')}
+            />
+          ) : (
+          <>
           <div className="text-center">
             <h2 className="font-serif text-3xl font-semibold tracking-tight text-slate-900 dark:text-white sm:text-[2rem]">
               Welcome back
@@ -272,10 +322,6 @@ export function LoginPage() {
                   : 'Sign in to ClassTrio'}
             </p>
           </div>
-
-          {brandingError && !isMasterLogin ? (
-            <p className="mt-6 text-center text-xs text-rose-600 dark:text-rose-400">{brandingError}</p>
-          ) : null}
 
           <form onSubmit={onSubmit} className="mt-9 space-y-5">
             <div className="space-y-2">
@@ -291,10 +337,15 @@ export function LoginPage() {
                 </span>
                 <Input
                   id="email"
-                  type={isMasterLogin ? 'email' : 'text'}
+                  name="username"
+                  type="text"
+                  inputMode="text"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  spellCheck={false}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder={isMasterLogin ? 'you@classtrio.in' : 'you@school.edu or VISWAM48291'}
+                  placeholder={isMasterLogin ? 'you@classtrio.in' : 'you@school.edu or xyz123'}
                   required
                   autoComplete="username"
                   className="rounded-xl border-brand-200/80 py-3 pl-11 shadow-none focus:border-brand-500 dark:border-slate-600"
@@ -334,14 +385,24 @@ export function LoginPage() {
                 />
                 Remember me
               </label>
-              <span className="text-sm text-slate-400">Need help? Ask your admin</span>
+              {isMasterLogin ? (
+                <span className="text-sm text-slate-400">Need help? Ask your admin</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setAuthMode('forgot')}
+                  className="text-sm font-semibold text-brand-700 hover:text-brand-600 dark:text-brand-300"
+                >
+                  Forgot password?
+                </button>
+              )}
             </div>
 
             <Button
               type="submit"
               size="lg"
               className="mt-2 w-full rounded-xl py-3.5 text-[15px] font-semibold"
-              disabled={loading || (!isMasterLogin && !!brandingError)}
+              disabled={loading}
             >
               {loading ? 'Signing in…' : 'Login'}
             </Button>
@@ -352,6 +413,8 @@ export function LoginPage() {
             <span className="font-semibold text-brand-700 dark:text-brand-300">Contact your administrator</span> for
             access.
           </p>
+          </>
+          )}
         </div>
       </main>
     </div>
