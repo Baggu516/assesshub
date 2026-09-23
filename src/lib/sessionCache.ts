@@ -8,7 +8,45 @@ export type OrgPlan = 'assessments_only' | 'ai_dashboard';
 export type OrgFeatures = {
   aiDashboard: boolean;
   aiAssessmentCreate: boolean;
+  worksheets: boolean;
+  assessments: boolean;
+  onlineExams: boolean;
 };
+
+/** Master console is not a paid plan. Every product flag stays on. */
+export const ALL_ORG_FEATURES: OrgFeatures = {
+  aiDashboard: true,
+  aiAssessmentCreate: true,
+  worksheets: true,
+  assessments: true,
+  onlineExams: true,
+};
+
+/** Match the API: missing newer flags stay off, missing onlineExams stays on. */
+export function resolveOrgFeatures(
+  org?: { subdomain?: string; plan?: OrgPlan; features?: Partial<OrgFeatures> | null } | null
+): OrgFeatures {
+  if (org?.subdomain === 'master') return { ...ALL_ORG_FEATURES };
+
+  const raw = org?.features;
+  if (!raw) {
+    return {
+      aiDashboard: org?.plan === 'ai_dashboard',
+      aiAssessmentCreate: false,
+      worksheets: false,
+      assessments: false,
+      onlineExams: Boolean(org),
+    };
+  }
+  const has = (key: keyof OrgFeatures) => Object.prototype.hasOwnProperty.call(raw, key);
+  return {
+    aiDashboard: raw.aiDashboard === true,
+    aiAssessmentCreate: raw.aiAssessmentCreate === true,
+    worksheets: has('worksheets') ? raw.worksheets === true : false,
+    assessments: has('assessments') ? raw.assessments === true : false,
+    onlineExams: has('onlineExams') ? raw.onlineExams === true : true,
+  };
+}
 
 export type CachedTenantOrganization = {
   id: string;

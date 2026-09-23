@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { api, setTokens } from '@/lib/api';
 import { useTenant } from '@/context/TenantContext';
-import { Button, Card, FormField, Input } from '@/components/ui';
+import { Button, Card, FormField, PasswordInput } from '@/components/ui';
 import type { AuthUser } from '@/types/user';
 import { useAuth } from '@/context/AuthContext';
 
@@ -54,9 +54,8 @@ export function AcceptInvitePage() {
           <p className="mt-1 text-sm text-slate-500">Set a password to join your workspace.</p>
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
             <FormField label="New password" htmlFor="invite-password" required>
-              <Input
+              <PasswordInput
                 id="invite-password"
-                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 minLength={8}

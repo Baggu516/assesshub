@@ -12,22 +12,23 @@ import { SettingsPage } from './pages/SettingsPage';
 import { KnowledgeBasePage } from './pages/KnowledgeBasePage';
 import { AssessmentsPage } from './pages/AssessmentsPage';
 import { AssessmentBuilderPage } from './pages/AssessmentBuilderPage';
+import { AssessmentResultsPage } from './pages/AssessmentResultsPage';
 import { GroupStudentsPage } from './pages/GroupStudentsPage';
 import { ClassesPage } from './pages/ClassesPage';
+import { ClassWizardPage } from './pages/ClassWizardPage';
 import { AcademicYearsPage } from './pages/AcademicYearsPage';
 import { ClassMastersPage } from './pages/ClassMastersPage';
 import { PromotionsPage } from './pages/PromotionsPage';
 import { MyAssessmentsPage } from './pages/MyAssessmentsPage';
 import { TakeAssessmentPage } from './pages/TakeAssessmentPage';
+import { LearningResourcesPage } from './pages/LearningResourcesPage';
+import { useTenantOrganization } from './hooks/api/useTenant';
+import { resolveOrgFeatures, type OrgFeatures } from './lib/sessionCache';
 import { OrganizationPage } from './pages/OrganizationPage';
+import { ClientsPage } from './pages/ClientsPage';
 import { AppLayout } from './components/layout/AppLayout';
 import { FullPageSpinner } from './components/ui/Spinner';
-import { RequirePlatformAuth } from './pages/platform/RequirePlatformAuth';
-import { PlatformLayout } from './pages/platform/PlatformLayout';
-import { PlatformLoginPage } from './pages/platform/PlatformLoginPage';
-import { PlatformOrganizationsPage } from './pages/platform/PlatformOrganizationsPage';
-import { PlatformDashboardPage } from './pages/platform/PlatformDashboardPage';
-import { PlatformUsersPage } from './pages/platform/PlatformUsersPage';
+import { useTenant } from './context/TenantContext';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -51,23 +52,33 @@ function RequireHierarchy({ roles, children }: { roles: HierarchyRole[]; childre
   return <>{children}</>;
 }
 
+function RequireFeature({
+  feature,
+  children,
+}: {
+  feature: keyof OrgFeatures;
+  children: React.ReactNode;
+}) {
+  const { data: org, isLoading } = useTenantOrganization();
+  if (isLoading && !org) return <FullPageSpinner />;
+  if (!resolveOrgFeatures(org)[feature]) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
+function RequireMaster({ children }: { children: React.ReactNode }) {
+  const { isMasterTenant } = useTenant();
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (!isMasterTenant || user.hierarchyRole !== 'admin') return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/platform/login" element={<PlatformLoginPage />} />
-      <Route
-        path="/platform"
-        element={
-          <RequirePlatformAuth>
-            <PlatformLayout />
-          </RequirePlatformAuth>
-        }
-      >
-        <Route index element={<PlatformDashboardPage />} />
-        <Route path="orgs" element={<PlatformOrganizationsPage />} />
-        <Route path="users" element={<PlatformUsersPage />} />
-      </Route>
+      <Route path="/platform/login" element={<Navigate to="/login" replace />} />
+      <Route path="/platform/*" element={<Navigate to="/clients" replace />} />
       <Route path="/accept-invite" element={<AcceptInvitePage />} />
       <Route
         path="/"
@@ -78,6 +89,14 @@ export default function App() {
         }
       >
         <Route index element={<DashboardPage />} />
+        <Route
+          path="clients"
+          element={
+            <RequireMaster>
+              <ClientsPage />
+            </RequireMaster>
+          }
+        />
         <Route
           path="users"
           element={
@@ -125,6 +144,26 @@ export default function App() {
           }
         />
         <Route
+          path="classes/new"
+          element={
+            <RequireHierarchy roles={['admin']}>
+              <RequirePermission keys={[PERMISSIONS.CLASS_MANAGE, PERMISSIONS.SETTINGS_MANAGE]}>
+                <ClassWizardPage />
+              </RequirePermission>
+            </RequireHierarchy>
+          }
+        />
+        <Route
+          path="classes/:classId/edit"
+          element={
+            <RequireHierarchy roles={['admin']}>
+              <RequirePermission keys={[PERMISSIONS.CLASS_MANAGE, PERMISSIONS.SETTINGS_MANAGE]}>
+                <ClassWizardPage />
+              </RequirePermission>
+            </RequireHierarchy>
+          }
+        />
+        <Route
           path="academic-years"
           element={
             <RequireHierarchy roles={['admin']}>
@@ -165,49 +204,149 @@ export default function App() {
           }
         />
         <Route
+          path="worksheets"
+          element={
+            <RequireFeature feature="worksheets">
+              <RequireHierarchy roles={['subordinate', 'user']}>
+                <LearningResourcesPage kind="worksheet" />
+              </RequireHierarchy>
+            </RequireFeature>
+          }
+        />
+        <Route
           path="assessments"
           element={
-            <RequireHierarchy roles={['subordinate']}>
-              <RequirePermission keys={[PERMISSIONS.ASSESSMENT_CREATE]}>
-                <AssessmentsPage />
-              </RequirePermission>
-            </RequireHierarchy>
+            <RequireFeature feature="assessments">
+              <RequireHierarchy roles={['subordinate']}>
+                <RequirePermission keys={[PERMISSIONS.ASSESSMENT_CREATE]}>
+                  <AssessmentsPage kind="assessment" />
+                </RequirePermission>
+              </RequireHierarchy>
+            </RequireFeature>
           }
         />
         <Route
           path="assessments/new"
           element={
-            <RequireHierarchy roles={['subordinate']}>
-              <RequirePermission keys={[PERMISSIONS.ASSESSMENT_CREATE]}>
-                <AssessmentBuilderPage />
-              </RequirePermission>
-            </RequireHierarchy>
+            <RequireFeature feature="assessments">
+              <RequireHierarchy roles={['subordinate']}>
+                <RequirePermission keys={[PERMISSIONS.ASSESSMENT_CREATE]}>
+                  <AssessmentBuilderPage kind="assessment" />
+                </RequirePermission>
+              </RequireHierarchy>
+            </RequireFeature>
           }
         />
         <Route
           path="assessments/:assessmentId/edit"
           element={
-            <RequireHierarchy roles={['subordinate']}>
-              <RequirePermission keys={[PERMISSIONS.ASSESSMENT_CREATE]}>
-                <AssessmentBuilderPage />
-              </RequirePermission>
-            </RequireHierarchy>
+            <RequireFeature feature="assessments">
+              <RequireHierarchy roles={['subordinate']}>
+                <RequirePermission keys={[PERMISSIONS.ASSESSMENT_CREATE]}>
+                  <AssessmentBuilderPage kind="assessment" />
+                </RequirePermission>
+              </RequireHierarchy>
+            </RequireFeature>
+          }
+        />
+        <Route
+          path="assessments/:assessmentId/results"
+          element={
+            <RequireFeature feature="assessments">
+              <RequireHierarchy roles={['subordinate']}>
+                <RequirePermission keys={[PERMISSIONS.ASSESSMENT_CREATE]}>
+                  <AssessmentResultsPage kind="assessment" />
+                </RequirePermission>
+              </RequireHierarchy>
+            </RequireFeature>
+          }
+        />
+        <Route
+          path="online-exams"
+          element={
+            <RequireFeature feature="onlineExams">
+              <RequireHierarchy roles={['subordinate']}>
+                <RequirePermission keys={[PERMISSIONS.ASSESSMENT_CREATE]}>
+                  <AssessmentsPage kind="online_exam" />
+                </RequirePermission>
+              </RequireHierarchy>
+            </RequireFeature>
+          }
+        />
+        <Route
+          path="online-exams/new"
+          element={
+            <RequireFeature feature="onlineExams">
+              <RequireHierarchy roles={['subordinate']}>
+                <RequirePermission keys={[PERMISSIONS.ASSESSMENT_CREATE]}>
+                  <AssessmentBuilderPage kind="online_exam" />
+                </RequirePermission>
+              </RequireHierarchy>
+            </RequireFeature>
+          }
+        />
+        <Route
+          path="online-exams/:assessmentId/edit"
+          element={
+            <RequireFeature feature="onlineExams">
+              <RequireHierarchy roles={['subordinate']}>
+                <RequirePermission keys={[PERMISSIONS.ASSESSMENT_CREATE]}>
+                  <AssessmentBuilderPage kind="online_exam" />
+                </RequirePermission>
+              </RequireHierarchy>
+            </RequireFeature>
+          }
+        />
+        <Route
+          path="online-exams/:assessmentId/results"
+          element={
+            <RequireFeature feature="onlineExams">
+              <RequireHierarchy roles={['subordinate']}>
+                <RequirePermission keys={[PERMISSIONS.ASSESSMENT_CREATE]}>
+                  <AssessmentResultsPage kind="online_exam" />
+                </RequirePermission>
+              </RequireHierarchy>
+            </RequireFeature>
           }
         />
         <Route
           path="my-assessments"
           element={
-            <RequirePermission keys={[PERMISSIONS.ASSESSMENT_VIEW, PERMISSIONS.ASSESSMENT_SUBMIT]}>
-              <MyAssessmentsPage />
-            </RequirePermission>
+            <RequireFeature feature="assessments">
+              <RequirePermission keys={[PERMISSIONS.ASSESSMENT_VIEW, PERMISSIONS.ASSESSMENT_SUBMIT]}>
+                <MyAssessmentsPage kind="assessment" />
+              </RequirePermission>
+            </RequireFeature>
           }
         />
         <Route
           path="my-assessments/:assignmentId"
           element={
-            <RequirePermission keys={[PERMISSIONS.ASSESSMENT_VIEW, PERMISSIONS.ASSESSMENT_SUBMIT]}>
-              <TakeAssessmentPage />
-            </RequirePermission>
+            <RequireFeature feature="assessments">
+              <RequirePermission keys={[PERMISSIONS.ASSESSMENT_VIEW, PERMISSIONS.ASSESSMENT_SUBMIT]}>
+                <TakeAssessmentPage kind="assessment" />
+              </RequirePermission>
+            </RequireFeature>
+          }
+        />
+        <Route
+          path="my-online-exams"
+          element={
+            <RequireFeature feature="onlineExams">
+              <RequirePermission keys={[PERMISSIONS.ASSESSMENT_VIEW, PERMISSIONS.ASSESSMENT_SUBMIT]}>
+                <MyAssessmentsPage kind="online_exam" />
+              </RequirePermission>
+            </RequireFeature>
+          }
+        />
+        <Route
+          path="my-online-exams/:assignmentId"
+          element={
+            <RequireFeature feature="onlineExams">
+              <RequirePermission keys={[PERMISSIONS.ASSESSMENT_VIEW, PERMISSIONS.ASSESSMENT_SUBMIT]}>
+                <TakeAssessmentPage kind="online_exam" />
+              </RequirePermission>
+            </RequireFeature>
           }
         />
       </Route>

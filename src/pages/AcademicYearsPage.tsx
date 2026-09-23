@@ -4,6 +4,9 @@ import { Card } from '@/components/ui/Card';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { FormField } from '@/components/ui/FormField';
+import { Input } from '@/components/ui/Input';
+import { Modal } from '@/components/ui/Modal';
 import { Skeleton } from '@/components/ui/Spinner';
 import {
   useAcademicYearsQuery,
@@ -12,11 +15,13 @@ import {
 } from '@/hooks/api/useAcademicYears';
 
 function YearFormModal({
+  open,
   initial,
   onClose,
   onSave,
   saving,
 }: {
+  open: boolean;
   initial?: AcademicYear | null;
   onClose: () => void;
   onSave: (data: {
@@ -50,64 +55,60 @@ function YearFormModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" role="dialog">
-      <Card className="max-w-md w-full">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
-              {initial ? 'Edit academic year' : 'New academic year'}
-            </h3>
-            <p className="text-xs text-slate-500 mt-1">
-              Classes, enrollments, and promotions are scoped to a year (e.g. 2025-26).
-            </p>
-          </div>
-          <button type="button" onClick={onClose} className="text-slate-500 hover:text-slate-800 text-sm">
-            Close
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-          <input
-            placeholder="Label * (e.g. 2025-26)"
-            className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm"
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={initial ? 'Edit academic year' : 'New academic year'}
+      description="Classes and enrollments are scoped to a year."
+      footer={
+        <>
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="year-form" disabled={!canSave || saving}>
+            {saving ? 'Saving…' : initial ? 'Save' : 'Create'}
+          </Button>
+        </>
+      }
+    >
+      <form id="year-form" onSubmit={handleSubmit} className="space-y-3">
+        <FormField label="Label" htmlFor="year-label" required>
+          <Input
+            id="year-label"
+            placeholder="e.g. 2025-26"
             value={label}
             onChange={(e) => setLabel(e.target.value)}
           />
-          <div className="grid grid-cols-2 gap-3">
-            <label className="text-xs text-slate-500 space-y-1">
-              <span>Start date</span>
-              <input
-                type="date"
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
-            </label>
-            <label className="text-xs text-slate-500 space-y-1">
-              <span>End date</span>
-              <input
-                type="date"
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-              />
-            </label>
-          </div>
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input type="checkbox" checked={isCurrent} onChange={(e) => setIsCurrent(e.target.checked)} />
-            Set as current academic year
-          </label>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="secondary" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={!canSave || saving}>
-              {saving ? 'Saving…' : initial ? 'Save' : 'Create'}
-            </Button>
-          </div>
-        </form>
-      </Card>
-    </div>
+        </FormField>
+        <div className="grid grid-cols-2 gap-3">
+          <FormField label="Start date" htmlFor="year-start">
+            <Input
+              id="year-start"
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
+          </FormField>
+          <FormField label="End date" htmlFor="year-end">
+            <Input
+              id="year-end"
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+            />
+          </FormField>
+        </div>
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+            checked={isCurrent}
+            onChange={(e) => setIsCurrent(e.target.checked)}
+          />
+          Set as current academic year
+        </label>
+      </form>
+    </Modal>
   );
 }
 
@@ -215,18 +216,17 @@ export function AcademicYearsPage() {
         </div>
       )}
 
-      {showForm ? (
-        <YearFormModal
-          key={editTarget?.id || 'new'}
-          initial={editTarget}
-          onClose={() => {
-            setShowForm(false);
-            setEditTarget(null);
-          }}
-          onSave={handleSave}
-          saving={create.isPending || update.isPending}
-        />
-      ) : null}
+      <YearFormModal
+        key={editTarget?.id || 'new'}
+        open={showForm}
+        initial={editTarget}
+        onClose={() => {
+          setShowForm(false);
+          setEditTarget(null);
+        }}
+        onSave={handleSave}
+        saving={create.isPending || update.isPending}
+      />
     </div>
   );
 }

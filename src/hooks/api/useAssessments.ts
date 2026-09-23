@@ -15,18 +15,36 @@ export interface AssessmentQuestion {
   prompt: string;
   points: number;
   order: number;
+  section?: string;
+  explanation?: string;
   options: QuestionOption[];
   acceptedAnswers?: string[];
   caseSensitive?: boolean;
 }
 
+export type ExamKind = 'assessment' | 'online_exam';
+
 export interface Assessment {
   id: string;
+  kind?: ExamKind;
   title: string;
   description: string;
+  durationMinutes?: number;
+  startAt?: string | null;
+  endAt?: string | null;
+  negativeMarkPerWrong?: number;
+  allowPartialCredit?: boolean;
+  showAnswersAfterSubmit?: boolean;
+  sections?: string[];
   status: 'draft' | 'published' | 'closed';
+  resultsReleased?: boolean;
+  resultsReleasedAt?: string | null;
   createdBy: string | null;
   questions: AssessmentQuestion[];
+  questionCount?: number;
+  totalMarks?: number;
+  assignmentCount?: number;
+  submittedCount?: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -48,13 +66,37 @@ export interface AssessmentAssignment {
   academicYearLabel?: string | null;
   dueDate?: string | null;
   status: 'pending' | 'submitted';
+  startedAt?: string | null;
+  expiresAt?: string | null;
+  remainingSeconds?: number | null;
+  submitReason?: 'manual' | 'timer' | 'fullscreen_exits' | null;
+  fullscreenExitCount?: number;
+  maxFullscreenExits?: number;
   submittedAt?: string | null;
-  score: number;
+  score: number | null;
   maxScore: number;
   assessmentTitle?: string;
+  assessmentDescription?: string;
   assessmentStatus?: string;
+  durationMinutes?: number;
+  startAt?: string | null;
+  endAt?: string | null;
+  questionCount?: number;
+  totalMarks?: number;
+  resultsReleased?: boolean;
+  resultsVisible?: boolean;
+  resultsHidden?: boolean;
   studentLabel?: string;
+  studentName?: string;
   studentEmail?: string;
+  scoredMarks?: number;
+  percentage?: number;
+  correctCount?: number;
+  partialCount?: number;
+  wrongCount?: number;
+  unansweredCount?: number;
+  timeTakenSeconds?: number | null;
+  autoSubmitted?: boolean;
   answers?: {
     questionId: string;
     selectedOptionIds?: string[];
@@ -64,7 +106,30 @@ export interface AssessmentAssignment {
   }[];
 }
 
-export function useAssessmentsQuery(params?: { status?: string; page?: number }) {
+export interface AssessmentResultsSummary {
+  assigned: number;
+  submitted: number;
+  pending: number;
+  averagePercentage: number;
+  highestPercentage: number;
+  pendingReleaseCount?: number;
+}
+
+export type AssessmentPayload = {
+  title: string;
+  description?: string;
+  durationMinutes?: number;
+  startAt?: string | null;
+  endAt?: string | null;
+  negativeMarkPerWrong?: number;
+  allowPartialCredit?: boolean;
+  showAnswersAfterSubmit?: boolean;
+  sections?: string[];
+  questions: AssessmentQuestion[];
+  kind?: ExamKind;
+};
+
+export function useAssessmentsQuery(params?: { status?: string; page?: number; kind?: ExamKind }) {
   return useQuery({
     queryKey: ['assessments', 'list', params ?? {}],
     queryFn: async () => {
@@ -99,19 +164,32 @@ export function useAssessmentAssigneesQuery(enabled = true) {
 }
 
 /** academicYearId: specific id, "all", or omit for current year */
-export function useMyAssignmentsQuery(academicYearId?: string) {
+export function useMyAssignmentsQuery(academicYearId?: string, kind?: ExamKind) {
   return useQuery({
-    queryKey: ['assessments', 'assignments', 'my', academicYearId ?? 'current'],
+    queryKey: ['assessments', 'assignments', 'my', academicYearId ?? 'current', kind ?? 'all'],
     queryFn: async () => {
       const { data } = await api.get<{
         assignments: AssessmentAssignment[];
         academicYear: { id: string; label: string; isCurrent: boolean } | null;
       }>('/assessments/assignments/my', {
-        params: academicYearId ? { academicYearId } : undefined,
+        params: {
+          ...(academicYearId ? { academicYearId } : {}),
+          ...(kind ? { kind } : {}),
+        },
       });
       return data;
     },
   });
+}
+
+export async function recordFullscreenExit(assignmentId: string) {
+  const { data } = await api.post<{
+    fullscreenExitCount: number;
+    maxFullscreenExits: number;
+    exitsRemaining: number;
+    forceSubmit: boolean;
+  }>(`/assessments/assignments/${assignmentId}/fullscreen-exit`);
+  return data;
 }
 
 export function useAssignmentQuery(assignmentId: string | undefined) {
@@ -135,6 +213,7 @@ export function useAssessmentResultsQuery(assessmentId: string | undefined, acad
       const { data } = await api.get<{
         assessment: Assessment;
         academicYear: { id: string; label: string; isCurrent: boolean } | null;
+        summary: AssessmentResultsSummary;
         results: AssessmentAssignment[];
       }>(`/assessments/${assessmentId}/results`, {
         params: academicYearId ? { academicYearId } : undefined,
@@ -181,7 +260,7 @@ export function useAssessmentMutations() {
   };
 
   const create = useMutation({
-    mutationFn: async (body: { title: string; description?: string; questions: AssessmentQuestion[] }) => {
+    mutationFn: async (body: AssessmentPayload) => {
       const { data } = await api.post<{ assessment: Assessment }>('/assessments', body);
       return data.assessment;
     },
@@ -192,12 +271,7 @@ export function useAssessmentMutations() {
     mutationFn: async ({
       id,
       ...body
-    }: {
-      id: string;
-      title?: string;
-      description?: string;
-      questions?: AssessmentQuestion[];
-    }) => {
+    }: Partial<AssessmentPayload> & { id: string }) => {
       const { data } = await api.patch<{ assessment: Assessment }>(`/assessments/${id}`, body);
       return data.assessment;
     },
@@ -208,6 +282,21 @@ export function useAssessmentMutations() {
     mutationFn: async (id: string) => {
       const { data } = await api.post<{ assessment: Assessment }>(`/assessments/${id}/publish`);
       return data.assessment;
+    },
+    onSuccess: invalidate,
+  });
+
+  const unpublish = useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await api.post<{ assessment: Assessment }>(`/assessments/${id}/unpublish`);
+      return data.assessment;
+    },
+    onSuccess: invalidate,
+  });
+
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/assessments/${id}`);
     },
     onSuccess: invalidate,
   });
@@ -244,10 +333,86 @@ export function useAssessmentMutations() {
     },
   });
 
+  const reattempt = useMutation({
+    mutationFn: async ({
+      assessmentId,
+      assignmentId,
+    }: {
+      assessmentId: string;
+      assignmentId: string;
+    }) => {
+      const { data } = await api.post(
+        `/assessments/${assessmentId}/results/${assignmentId}/reattempt`
+      );
+      return data;
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['assessments', vars.assessmentId, 'results'] });
+      invalidate();
+    },
+  });
+
+  const hideResult = useMutation({
+    mutationFn: async ({
+      assessmentId,
+      assignmentId,
+      hidden,
+    }: {
+      assessmentId: string;
+      assignmentId: string;
+      hidden: boolean;
+    }) => {
+      const { data } = await api.post(
+        `/assessments/${assessmentId}/results/${assignmentId}/hide`,
+        { hidden }
+      );
+      return data;
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['assessments', vars.assessmentId, 'results'] });
+      qc.invalidateQueries({ queryKey: ['assessments', 'assignments'] });
+      invalidate();
+    },
+  });
+
+  const deleteResult = useMutation({
+    mutationFn: async ({
+      assessmentId,
+      assignmentId,
+    }: {
+      assessmentId: string;
+      assignmentId: string;
+    }) => {
+      await api.delete(`/assessments/${assessmentId}/results/${assignmentId}`);
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['assessments', vars.assessmentId, 'results'] });
+      invalidate();
+    },
+  });
+
+  const releaseResults = useMutation({
+    mutationFn: async (assessmentId: string) => {
+      const { data } = await api.post<{
+        message: string;
+        assessment: Assessment;
+        notify: { recipients: number; emailed: number; skipped: number; failed: number };
+        summary: { pendingReleaseCount: number };
+      }>(`/assessments/${assessmentId}/release-results`);
+      return data;
+    },
+    onSuccess: (_d, assessmentId) => {
+      qc.invalidateQueries({ queryKey: ['assessments', assessmentId, 'results'] });
+      qc.invalidateQueries({ queryKey: ['assessments', 'assignments'] });
+      invalidate();
+    },
+  });
+
   const submit = useMutation({
     mutationFn: async ({
       assignmentId,
       answers,
+      submitReason,
     }: {
       assignmentId: string;
       answers: {
@@ -255,8 +420,12 @@ export function useAssessmentMutations() {
         selectedOptionIds?: string[];
         textAnswer?: string;
       }[];
+      submitReason?: 'manual' | 'timer' | 'fullscreen_exits';
     }) => {
-      const { data } = await api.post(`/assessments/assignments/${assignmentId}/submit`, { answers });
+      const { data } = await api.post(`/assessments/assignments/${assignmentId}/submit`, {
+        answers,
+        submitReason: submitReason || 'manual',
+      });
       return data;
     },
     onSuccess: () => {
@@ -265,5 +434,17 @@ export function useAssessmentMutations() {
     },
   });
 
-  return { create, update, publish, assign, submit };
+  return {
+    create,
+    update,
+    publish,
+    unpublish,
+    remove,
+    assign,
+    reattempt,
+    hideResult,
+    deleteResult,
+    releaseResults,
+    submit,
+  };
 }

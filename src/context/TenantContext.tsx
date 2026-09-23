@@ -1,20 +1,28 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { isMasterHost } from '@/lib/masterHost';
 
 const STORAGE_KEY = 'ah_tenant_subdomain';
 
 interface TenantContextValue {
   subdomain: string;
   setSubdomain: (s: string) => void;
+  /** True when this session is the reserved master org (full app + Clients). */
+  isMasterTenant: boolean;
 }
 
 const TenantContext = createContext<TenantContextValue | null>(null);
 
 function inferSubdomainFromHost(): string | null {
   const host = window.location.hostname.toLowerCase();
-  const base = (import.meta.env.VITE_BASE_DOMAIN || 'assesshub.com').toLowerCase();
-  if (host === 'localhost' || host === '127.0.0.1') return null;
+  const base = (import.meta.env.VITE_BASE_DOMAIN || 'classtrio.in').toLowerCase();
+
+  if (isMasterHost(host) && (host === 'localhost' || host === '127.0.0.1' || host.startsWith('master.'))) {
+    return 'master';
+  }
+
   if (host.endsWith(`.${base}`) && host !== base) {
-    return host.replace(`.${base}`, '').split('.')[0] || null;
+    const sub = host.replace(`.${base}`, '').split('.')[0] || null;
+    return sub === 'master' ? 'master' : sub;
   }
   if (host.endsWith('.localhost')) {
     return host.replace('.localhost', '').split('.')[0] || null;
@@ -22,20 +30,12 @@ function inferSubdomainFromHost(): string | null {
   return null;
 }
 
-function defaultSubdomainForPlainLocalhost(): string {
-  const host = typeof window !== 'undefined' ? window.location.hostname.toLowerCase() : '';
-  const plain = host === 'localhost' || host === '127.0.0.1';
-  const v = (import.meta.env.VITE_DEFAULT_TENANT_SUBDOMAIN || '').trim().toLowerCase();
-  return plain && v ? v : '';
-}
-
 export function TenantProvider({ children }: { children: React.ReactNode }) {
   const [subdomain, setSubdomainState] = useState(() => {
     const fromHost = inferSubdomainFromHost();
     if (fromHost) return fromHost;
-    const stored = localStorage.getItem(STORAGE_KEY) || '';
-    if (stored) return stored;
-    return defaultSubdomainForPlainLocalhost();
+    if (typeof window !== 'undefined' && isMasterHost()) return 'master';
+    return localStorage.getItem(STORAGE_KEY) || 'master';
   });
 
   useEffect(() => {
@@ -45,12 +45,9 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(STORAGE_KEY, fromHost);
       return;
     }
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) return;
-    const devDefault = defaultSubdomainForPlainLocalhost();
-    if (devDefault) {
-      setSubdomainState(devDefault);
-      localStorage.setItem(STORAGE_KEY, devDefault);
+    if (isMasterHost()) {
+      setSubdomainState('master');
+      localStorage.setItem(STORAGE_KEY, 'master');
     }
   }, []);
 
@@ -61,12 +58,15 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     else localStorage.removeItem(STORAGE_KEY);
   };
 
+  const isMasterTenant = subdomain === 'master';
+
   const value = useMemo(
     () => ({
       subdomain,
       setSubdomain,
+      isMasterTenant,
     }),
-    [subdomain]
+    [subdomain, isMasterTenant]
   );
 
   return <TenantContext.Provider value={value}>{children}</TenantContext.Provider>;

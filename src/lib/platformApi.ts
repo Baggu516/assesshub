@@ -48,6 +48,10 @@ platformApi.interceptors.request.use((config) => {
   } else if (key) {
     config.headers['X-Platform-Key'] = key;
   }
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    // Let the browser set multipart boundary
+    delete config.headers['Content-Type'];
+  }
   return config;
 });
 
@@ -58,8 +62,8 @@ platformApi.interceptors.response.use(
     if (status === 401 || status === 403) {
       clearPlatformSession();
       const path = window.location.pathname;
-      if (!path.startsWith('/platform/login')) {
-        window.location.assign('/platform/login');
+      if (path !== '/login' && !path.startsWith('/platform/login')) {
+        window.location.assign('/login');
       }
     }
     throw error;

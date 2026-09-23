@@ -3,9 +3,11 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import clsx from 'clsx';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useTenant } from '@/context/TenantContext';
 import { PERMISSIONS } from '@/constants/permissions';
 import { useTenantOrganization } from '@/hooks/api/useTenant';
 import { resolveNavLabel } from '@/lib/sidebarLabels';
+import { resolveOrgFeatures } from '@/lib/sessionCache';
 import { AiChatWidget } from '@/components/dashboard/AiChatWidget';
 
 const SIDEBAR_KEY = 'ah_sidebar_collapsed';
@@ -65,6 +67,16 @@ function NavIcon({ to }: { to: string }) {
           <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
         </svg>
       );
+    case '/clients':
+      return (
+        <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3a.75.75 0 01.75-.75h3a.75.75 0 01.75.75v3M3 3h12"
+          />
+        </svg>
+      );
     case '/profile':
       return (
         <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
@@ -95,6 +107,19 @@ function NavIcon({ to }: { to: string }) {
       return (
         <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+        </svg>
+      );
+    case '/online-exams':
+    case '/my-online-exams':
+      return (
+        <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+      );
+    case '/worksheets':
+      return (
+        <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
         </svg>
       );
     default:
@@ -131,6 +156,7 @@ function LogoutIcon({ className }: { className?: string }) {
 export function AppLayout() {
   const location = useLocation();
   const { user, logout } = useAuth();
+  const { isMasterTenant } = useTenant();
   const { resolved, setMode, mode } = useTheme();
   const [collapsed, setCollapsed] = useState(() =>
     typeof window !== 'undefined' ? localStorage.getItem(SIDEBAR_KEY) === '1' : false
@@ -140,7 +166,8 @@ export function AppLayout() {
   const { data: org } = useTenantOrganization();
 
   const sidebarLabels = org?.settings?.sidebarLabels;
-  const hasAiPlan = org?.features?.aiDashboard ?? org?.plan === 'ai_dashboard';
+  const features = resolveOrgFeatures(org);
+  const hasAiPlan = features.aiDashboard;
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_KEY, collapsed ? '1' : '0');
@@ -153,8 +180,16 @@ export function AppLayout() {
   const items: { to: string; label: string; show: boolean }[] = useMemo(
     () => {
       const isTeacher = user?.hierarchyRole === 'subordinate';
+      const isStudent = user?.hierarchyRole === 'user';
+      const teaches =
+        !!user && isTeacher && can(user.permissions, PERMISSIONS.ASSESSMENT_CREATE);
       return [
       { to: '/', label: resolveNavLabel('/', user?.hierarchyRole, sidebarLabels), show: true },
+      {
+        to: '/clients',
+        label: 'Clients',
+        show: isMasterTenant && user?.hierarchyRole === 'admin',
+      },
       {
         to: '/subordinates',
         label: resolveNavLabel('/subordinates', user?.hierarchyRole, sidebarLabels),
@@ -210,14 +245,29 @@ export function AppLayout() {
         show: !!user && isTeacher && can(user.permissions, PERMISSIONS.ASSESSMENT_CREATE),
       },
       {
+        to: '/worksheets',
+        label: 'Worksheets',
+        show: features.worksheets && (teaches || isStudent),
+      },
+      {
         to: '/assessments',
         label: resolveNavLabel('/assessments', user?.hierarchyRole, sidebarLabels),
-        show: !!user && isTeacher && can(user.permissions, PERMISSIONS.ASSESSMENT_CREATE),
+        show: features.assessments && teaches,
       },
       {
         to: '/my-assessments',
         label: resolveNavLabel('/my-assessments', user?.hierarchyRole, sidebarLabels),
-        show: !!user && user.hierarchyRole === 'user',
+        show: features.assessments && isStudent,
+      },
+      {
+        to: '/online-exams',
+        label: 'Online exams',
+        show: features.onlineExams && teaches,
+      },
+      {
+        to: '/my-online-exams',
+        label: 'Online exams',
+        show: features.onlineExams && isStudent,
       },
       { to: '/profile', label: resolveNavLabel('/profile', user?.hierarchyRole, sidebarLabels), show: true },
       {
@@ -237,7 +287,7 @@ export function AppLayout() {
       },
     ];
     },
-    [user, sidebarLabels, hasAiPlan]
+    [user, sidebarLabels, hasAiPlan, isMasterTenant, features]
   );
 
   const visibleItems = useMemo(() => items.filter((i) => i.show), [items]);
@@ -286,12 +336,12 @@ export function AppLayout() {
           >
             {!collapsed ? (
               <>
-                <span className="font-semibold text-slate-900 dark:text-white truncate">AssessHub</span>
+                <span className="font-semibold text-slate-900 dark:text-white truncate">ClassTrio</span>
                 <span className="ml-2 text-xs text-slate-500 shrink-0 hidden xl:inline">Education</span>
               </>
             ) : (
-              <span className="font-bold text-lg text-brand-600 dark:text-brand-400" title="AssessHub">
-                A
+              <span className="font-bold text-lg text-brand-600 dark:text-brand-400" title="ClassTrio">
+                C
               </span>
             )}
           </div>
@@ -454,7 +504,7 @@ export function AppLayout() {
           </svg>
         </button>
 
-        <main className="flex-1 w-full min-w-0 min-h-0 p-4 pt-16 md:pt-8 md:p-8 overflow-y-auto">
+        <main className="relative flex-1 w-full min-w-0 min-h-0 p-4 pt-16 md:pt-8 md:p-8 overflow-y-auto">
           <div className="w-full">
             <Outlet />
           </div>

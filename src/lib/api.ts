@@ -48,6 +48,9 @@ api.interceptors.request.use((config) => {
   if (tenant) {
     config.headers['X-Tenant-Subdomain'] = tenant;
   }
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
   return config;
 });
 

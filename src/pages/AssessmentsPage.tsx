@@ -15,14 +15,15 @@ import {
 } from '@/components/ui';
 import {
   useAssessmentsQuery,
-  useAssessmentResultsQuery,
   useAssessmentAssignmentSummaryQuery,
   useAssessmentMutations,
   type Assessment,
+  type ExamKind,
 } from '@/hooks/api/useAssessments';
 import { useStudentGroupsQuery } from '@/hooks/api/useStudentGroups';
 import { useAcademicYearsQuery } from '@/hooks/api/useAcademicYears';
 import { useTenantOrganization } from '@/hooks/api/useTenant';
+import { resolveOrgFeatures } from '@/lib/sessionCache';
 import {
   CreateWithAiModal,
   type AiAssessmentDraft,
@@ -37,6 +38,19 @@ function toDatetimeLocalValue(iso: string | null | undefined) {
   if (Number.isNaN(d.getTime())) return '';
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function formatDateTime(iso: string | null | undefined) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 }
 
 function AssignModal({
@@ -70,10 +84,7 @@ function AssignModal({
     setAcademicYearId(current.id);
   }, [sortedYears, academicYearId]);
 
-  const {
-    data: summary,
-    isLoading: summaryLoading,
-  } = useAssessmentAssignmentSummaryQuery(
+  const { data: summary, isLoading: summaryLoading } = useAssessmentAssignmentSummaryQuery(
     assessment.id,
     academicYearId || undefined,
     open && Boolean(academicYearId)
@@ -139,7 +150,6 @@ function AssignModal({
     });
   };
 
-  const loadingSummary = summaryLoading;
   const assignedLabel =
     summary && summary.totalAssigned > 0
       ? `Already assigned to ${summary.totalAssigned} student${summary.totalAssigned !== 1 ? 's' : ''}${
@@ -191,8 +201,8 @@ function AssignModal({
         </>
       }
     >
-      <div className="space-y-4">
-        <FormField label="Academic year" htmlFor="assign-year" hint="Students see this under that year">
+      <div className="space-y-3">
+        <FormField label="Academic year" htmlFor="assign-year">
           {yearsLoading ? (
             <Skeleton className="h-10" />
           ) : (
@@ -215,11 +225,7 @@ function AssignModal({
           )}
         </FormField>
 
-        <FormField
-          label="Due date"
-          htmlFor="assign-due"
-          hint="Optional · applies to all selected groups"
-        >
+        <FormField label="Due date" htmlFor="assign-due" hint="Optional">
           <Input
             id="assign-due"
             type="datetime-local"
@@ -229,25 +235,20 @@ function AssignModal({
         </FormField>
 
         {assignedLabel ? (
-          <p className="rounded-xl border border-brand-200 bg-brand-50/60 px-3 py-2.5 text-sm text-slate-700 dark:border-brand-500/40 dark:bg-brand-500/10 dark:text-slate-200">
+          <p className="rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
             {assignedLabel}
           </p>
         ) : null}
 
-        {isLoading || loadingSummary ? (
+        {isLoading || summaryLoading ? (
           <Skeleton className="h-24" />
         ) : groups.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-slate-200 px-3 py-4 text-sm text-slate-500 dark:border-slate-700">
-            No student groups yet. Create groups under Group students first.
-          </p>
+          <p className="py-3 text-sm text-slate-500">No student groups yet.</p>
         ) : (
-          <div className="space-y-2 max-h-56 overflow-y-auto">
+          <div className="max-h-52 space-y-0.5 overflow-y-auto rounded-lg border border-slate-200 p-1 dark:border-slate-700">
             {groups.map((g) => {
               const already = alreadyAssignedGroupIds.has(g.id);
               const checked = selected.has(g.id) || already;
-              const assignedInGroup = (g.studentIds || []).filter((sid) =>
-                (summary?.assignedStudentIds || []).includes(sid)
-              ).length;
               return (
                 <button
                   key={g.id}
@@ -255,25 +256,23 @@ function AssignModal({
                   disabled={already}
                   onClick={() => toggle(g.id)}
                   className={clsx(
-                    'flex w-full items-start gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors',
-                    already && 'cursor-default opacity-95',
+                    'flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors',
+                    already && 'cursor-default opacity-90',
                     checked
-                      ? 'border-brand-400 bg-brand-50/70 dark:border-brand-500/50 dark:bg-brand-500/10'
-                      : 'border-slate-200 hover:border-slate-300 dark:border-slate-600 dark:hover:border-slate-500'
+                      ? 'bg-brand-50 dark:bg-brand-500/10'
+                      : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
                   )}
                 >
                   <span
                     className={clsx(
-                      'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border-2',
+                      'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border',
                       checked
                         ? 'border-brand-600 bg-brand-600 text-white'
-                        : 'border-slate-300 dark:border-slate-500',
-                      already && 'opacity-80'
+                        : 'border-slate-300 dark:border-slate-500'
                     )}
-                    aria-hidden
                   >
-                    {checked && (
-                      <svg className="h-2.5 w-2.5" viewBox="0 0 12 12" fill="none">
+                    {checked ? (
+                      <svg className="h-2 w-2" viewBox="0 0 12 12" fill="none">
                         <path
                           d="M2 6l3 3 5-5"
                           stroke="currentColor"
@@ -282,24 +281,12 @@ function AssignModal({
                           strokeLinejoin="round"
                         />
                       </svg>
-                    )}
+                    ) : null}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="flex flex-wrap items-center gap-2">
-                      <span className="block text-sm font-medium text-slate-900 dark:text-white">
-                        {g.name}
-                      </span>
-                      {already ? (
-                        <Badge tone="success">Assigned</Badge>
-                      ) : assignedInGroup > 0 ? (
-                        <Badge tone="neutral">
-                          {assignedInGroup}/{g.memberCount} assigned
-                        </Badge>
-                      ) : null}
-                    </span>
-                    <span className="block text-xs text-slate-500">
+                    <span className="text-sm text-slate-900 dark:text-white">{g.name}</span>
+                    <span className="block truncate text-[11px] text-slate-400">
                       {g.memberCount} student{g.memberCount !== 1 ? 's' : ''}
-                      {g.members?.length ? ` · ${g.members.map((m) => m.label).join(', ')}` : ''}
                     </span>
                   </span>
                 </button>
@@ -312,117 +299,54 @@ function AssignModal({
   );
 }
 
-function ResultsModal({
-  open,
-  assessmentId,
-  onClose,
-}: {
-  open: boolean;
-  assessmentId: string;
-  onClose: () => void;
-}) {
-  const { data: years = [] } = useAcademicYearsQuery();
-  const sortedYears = useMemo(
-    () => [...years].sort((a, b) => b.label.localeCompare(a.label)),
-    [years]
-  );
-  const [yearId, setYearId] = useState('');
-
-  useEffect(() => {
-    if (yearId || !sortedYears.length) return;
-    const current = sortedYears.find((y) => y.isCurrent) || sortedYears[0];
-    setYearId(current.id);
-  }, [sortedYears, yearId]);
-
-  const { data, isLoading } = useAssessmentResultsQuery(assessmentId, yearId || undefined);
-
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="Results"
-      description={data?.assessment.title}
-      footer={
-        <Button type="button" variant="secondary" onClick={onClose}>
-          Close
-        </Button>
-      }
-    >
-      <div className="space-y-4">
-        {sortedYears.length ? (
-          <label className="block text-xs text-slate-500 space-y-1">
-            <span>Academic year</span>
-            <select
-              className={selectClass}
-              value={yearId}
-              onChange={(e) => setYearId(e.target.value)}
-            >
-              {sortedYears.map((y) => (
-                <option key={y.id} value={y.id}>
-                  {y.label}
-                  {y.isCurrent ? ' (current)' : ''}
-                </option>
-              ))}
-              <option value="all">All years</option>
-            </select>
-          </label>
-        ) : null}
-
-        {isLoading || (sortedYears.length > 0 && !yearId) ? (
-          <Skeleton className="h-32" />
-        ) : !data?.results.length ? (
-          <p className="text-sm text-slate-500">No assignments for this year yet.</p>
-        ) : (
-          <div className="space-y-2">
-            {data.results.map((r) => (
-              <div
-                key={r.id}
-                className="flex items-center justify-between rounded-xl border border-slate-200/80 px-3 py-2.5 text-sm dark:border-slate-700"
-              >
-                <div className="min-w-0">
-                  <p className="font-medium text-slate-900 dark:text-white truncate">{r.studentLabel}</p>
-                  <p className="text-xs text-slate-500 truncate">
-                    {r.studentEmail}
-                    {yearId === 'all' && r.academicYearLabel ? ` · ${r.academicYearLabel}` : ''}
-                  </p>
-                </div>
-                <Badge tone={r.status === 'submitted' ? 'success' : 'warning'}>
-                  {r.status === 'submitted' ? `${r.score}/${r.maxScore}` : 'Pending'}
-                </Badge>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </Modal>
-  );
-}
-
-function statusTone(status: Assessment['status']) {
-  if (status === 'published') return 'success' as const;
-  if (status === 'closed') return 'neutral' as const;
-  return 'warning' as const;
-}
-
-export function AssessmentsPage() {
+export function AssessmentsPage({ kind = 'assessment' }: { kind?: ExamKind }) {
+  const online = kind === 'online_exam';
+  const base = online ? '/online-exams' : '/assessments';
+  const noun = online ? 'online exam' : 'assessment';
   const navigate = useNavigate();
-  const { data, isLoading } = useAssessmentsQuery();
+  const { data, isLoading } = useAssessmentsQuery({ kind });
   const { data: org } = useTenantOrganization();
-  const { publish, assign } = useAssessmentMutations();
+  const { publish, unpublish, remove, assign } = useAssessmentMutations();
   const [assignTarget, setAssignTarget] = useState<Assessment | null>(null);
-  const [resultsId, setResultsId] = useState<string | null>(null);
   const [aiOpen, setAiOpen] = useState(false);
+  const [busyId, setBusyId] = useState('');
 
   const assessments = data?.assessments ?? [];
-  const canCreateWithAi = org?.features?.aiAssessmentCreate === true;
+  const canCreateWithAi = resolveOrgFeatures(org).aiAssessmentCreate;
 
-  const handlePublish = async (id: string) => {
+  const handlePublishToggle = async (a: Assessment) => {
+    setBusyId(a.id);
     try {
-      await publish.mutateAsync(id);
-      toast.success('Assessment published');
+      if (a.status === 'published') {
+        if (!window.confirm(`Unpublish "${a.title}"? Students will no longer see it.`)) return;
+        await unpublish.mutateAsync(a.id);
+        toast.success('Unpublished');
+      } else {
+        await publish.mutateAsync(a.id);
+        toast.success('Published');
+      }
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      toast.error(msg || 'Failed to publish');
+      toast.error(msg || 'Failed to update publish status');
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const handleDelete = async (a: Assessment) => {
+    const warning = a.submittedCount
+      ? `Delete "${a.title}"? ${a.submittedCount} result(s) will be removed too.`
+      : `Delete "${a.title}"?`;
+    if (!window.confirm(warning)) return;
+    setBusyId(a.id);
+    try {
+      await remove.mutateAsync(a.id);
+      toast.success(online ? 'Online exam deleted' : 'Assessment deleted');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg || 'Failed to delete');
+    } finally {
+      setBusyId('');
     }
   };
 
@@ -442,15 +366,16 @@ export function AssessmentsPage() {
     }
   };
 
-  const handleAiGenerated = (draft: AiAssessmentDraft) => {
-    navigate('/assessments/new', { state: { aiDraft: draft } });
-  };
-
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Assessment dashboard"
-        description="Create questions, publish assessments, and assign them to student groups for an academic year."
+        eyebrow={online ? 'Exams' : 'Assessments'}
+        title={online ? 'Online exams' : 'Assessments'}
+        description={
+          online
+            ? 'CBT exams. If a student leaves fullscreen three times, the exam submits automatically.'
+            : 'Question papers students attempt online. This is not the locked CBT exam.'
+        }
         actions={
           <>
             {canCreateWithAi ? (
@@ -458,21 +383,25 @@ export function AssessmentsPage() {
                 Create with AI
               </Button>
             ) : null}
-            <Button onClick={() => navigate('/assessments/new')}>New assessment</Button>
+            <Button onClick={() => navigate(`${base}/new`)}>+ New {noun}</Button>
           </>
         }
       />
 
       {isLoading ? (
-        <div className="space-y-3">
-          <Skeleton className="h-20" />
-          <Skeleton className="h-20" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Skeleton className="h-48" />
+          <Skeleton className="h-48" />
         </div>
       ) : assessments.length === 0 ? (
         <Card className="p-0">
           <EmptyState
-            title="No assessments yet"
-            description="Create your first assessment to start assigning quizzes to students."
+            title={online ? 'No online exams yet' : 'No assessments yet'}
+            description={
+              online
+                ? 'Create an exam with questions, assign students, then launch the locked CBT.'
+                : 'Create an assessment with questions, assign students, then launch.'
+            }
             action={
               <div className="flex flex-wrap justify-center gap-2">
                 {canCreateWithAi ? (
@@ -480,60 +409,95 @@ export function AssessmentsPage() {
                     Create with AI
                   </Button>
                 ) : null}
-                <Button onClick={() => navigate('/assessments/new')}>New assessment</Button>
+                <Button onClick={() => navigate(`${base}/new`)}>Create {noun}</Button>
               </div>
             }
           />
         </Card>
       ) : (
-        <div className="space-y-3">
-          {assessments.map((a) => (
-            <Card
-              key={a.id}
-              className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="font-semibold text-slate-900 dark:text-white truncate">{a.title}</h3>
-                  <Badge tone={statusTone(a.status)}>{a.status}</Badge>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {assessments.map((a) => {
+            const qCount = a.questionCount ?? a.questions?.length ?? 0;
+            const marks =
+              a.totalMarks ??
+              (a.questions || []).reduce((sum, q) => sum + (Number(q.points) || 0), 0);
+            const startLabel = formatDateTime(a.startAt);
+            const endLabel = formatDateTime(a.endAt);
+            const busy = busyId === a.id;
+
+            return (
+              <Card key={a.id} className="flex flex-col p-5">
+                <div className="mb-2 flex flex-wrap gap-2">
+                  <Badge tone={a.status === 'published' ? 'success' : 'neutral'}>
+                    {a.status === 'published' ? 'Published' : a.status === 'closed' ? 'Closed' : 'Draft'}
+                  </Badge>
+                  {(a.submittedCount || 0) > 0 ? (
+                    <Badge tone={a.resultsReleased ? 'info' : 'warning'}>
+                      {a.resultsReleased ? 'Results out' : 'Results held'}
+                    </Badge>
+                  ) : (
+                    <Badge tone="warning">No submissions</Badge>
+                  )}
+                  {startLabel ? <Badge tone="warning">{startLabel}</Badge> : null}
+                  {endLabel ? <Badge tone="neutral">Ends {endLabel}</Badge> : null}
                 </div>
-                <p className="mt-1 text-xs text-slate-500">
-                  {a.questions.length} question{a.questions.length !== 1 ? 's' : ''}
-                  {a.description ? ` · ${a.description}` : ''}
+
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">{a.title}</h3>
+                {a.description ? (
+                  <p className="mt-1 line-clamp-2 text-sm text-slate-500">{a.description}</p>
+                ) : null}
+
+                <p className="mt-3 text-xs text-slate-500">
+                  {qCount} question{qCount !== 1 ? 's' : ''} · {marks} mark{marks !== 1 ? 's' : ''} ·{' '}
+                  {a.durationMinutes ?? 60} min · {a.assignmentCount || 0} assigned ·{' '}
+                  {a.submittedCount || 0} attempt{(a.submittedCount || 0) !== 1 ? 's' : ''}
                 </p>
-              </div>
-              <div className="flex shrink-0 flex-wrap gap-2">
-                {a.status === 'draft' && (
-                  <>
+
+                <div className="mt-auto flex flex-wrap gap-2 pt-4">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => navigate(`${base}/${a.id}/results`)}
+                  >
+                    Results
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => handlePublishToggle(a)}
+                  >
+                    {a.status === 'published' ? 'Unpublish' : 'Publish'}
+                  </Button>
+                  {a.status === 'draft' ? (
                     <Button
                       variant="secondary"
                       size="sm"
-                      onClick={() => navigate(`/assessments/${a.id}/edit`)}
+                      onClick={() => navigate(`${base}/${a.id}/edit`)}
                     >
                       Edit
                     </Button>
-                    <Button size="sm" onClick={() => handlePublish(a.id)}>
-                      Publish
-                    </Button>
-                  </>
-                )}
-                {a.status === 'published' && (
-                  <>
+                  ) : (
                     <Button variant="secondary" size="sm" onClick={() => setAssignTarget(a)}>
                       Assign
                     </Button>
-                    <Button variant="secondary" size="sm" onClick={() => setResultsId(a.id)}>
-                      Results
-                    </Button>
-                  </>
-                )}
-              </div>
-            </Card>
-          ))}
+                  )}
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => handleDelete(a)}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              </Card>
+            );
+          })}
         </div>
       )}
 
-      {assignTarget && (
+      {assignTarget ? (
         <AssignModal
           open
           assessment={assignTarget}
@@ -541,17 +505,15 @@ export function AssessmentsPage() {
           onAssign={handleAssign}
           saving={assign.isPending}
         />
-      )}
-
-      {resultsId && (
-        <ResultsModal open assessmentId={resultsId} onClose={() => setResultsId(null)} />
-      )}
+      ) : null}
 
       {canCreateWithAi ? (
         <CreateWithAiModal
           open={aiOpen}
           onClose={() => setAiOpen(false)}
-          onGenerated={handleAiGenerated}
+          onGenerated={(draft: AiAssessmentDraft) =>
+            navigate(`${base}/new`, { state: { aiDraft: draft } })
+          }
         />
       ) : null}
     </div>

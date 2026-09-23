@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 
 export type PlatformRegistryUser = {
   id: string;
@@ -72,21 +73,21 @@ function CreateUserModal({
       open={open}
       onClose={onClose}
       title="Add platform user"
-      description="Registry account for /platform — separate from tenant app users."
+      description="Console access for /platform."
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
           <Button type="submit" form="create-user-form" disabled={mutation.isPending}>
-            {mutation.isPending ? 'Creating…' : 'Create user'}
+            {mutation.isPending ? 'Creating…' : 'Create'}
           </Button>
         </>
       }
     >
       <form
         id="create-user-form"
-        className="space-y-4"
+        className="space-y-3"
         onSubmit={(e) => {
           e.preventDefault();
           mutation.mutate();
@@ -98,19 +99,18 @@ function CreateUserModal({
             required
             type="email"
             autoComplete="off"
-            className="mt-1.5"
+            className="mt-1"
             value={form.email}
             onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
           />
         </label>
         <label className="ah-label">
           Password
-          <Input
+          <PasswordInput
             required
-            type="password"
             minLength={8}
             autoComplete="new-password"
-            className="mt-1.5"
+            className="mt-1"
             value={form.password}
             onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
           />
@@ -119,7 +119,7 @@ function CreateUserModal({
           <label className="ah-label">
             First name
             <Input
-              className="mt-1.5"
+              className="mt-1"
               value={form.firstName}
               onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
             />
@@ -127,13 +127,13 @@ function CreateUserModal({
           <label className="ah-label">
             Last name
             <Input
-              className="mt-1.5"
+              className="mt-1"
               value={form.lastName}
               onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
             />
           </label>
         </div>
-        <label className="flex cursor-pointer items-center gap-2.5 text-sm font-medium text-slate-700 dark:text-slate-300">
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
           <input
             type="checkbox"
             className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
@@ -210,14 +210,14 @@ function EditUserModal({
       open={open && !!user}
       onClose={onClose}
       title="Edit platform user"
-      description="Leave password blank to keep the current password."
+      description="Leave password blank to keep current."
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
           <Button type="submit" form="edit-user-form" disabled={mutation.isPending}>
-            {mutation.isPending ? 'Saving…' : 'Save changes'}
+            {mutation.isPending ? 'Saving…' : 'Save'}
           </Button>
         </>
       }
@@ -225,7 +225,7 @@ function EditUserModal({
       {user && (
         <form
           id="edit-user-form"
-          className="space-y-4"
+          className="space-y-3"
           onSubmit={(e) => {
             e.preventDefault();
             mutation.mutate();
@@ -236,18 +236,17 @@ function EditUserModal({
             <Input
               required
               type="email"
-              className="mt-1.5"
+              className="mt-1"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
           </label>
           <label className="ah-label">
-            New password (optional)
-            <Input
-              type="password"
+            New password
+            <PasswordInput
               minLength={8}
               autoComplete="new-password"
-              className="mt-1.5"
+              className="mt-1"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
@@ -257,7 +256,7 @@ function EditUserModal({
             <label className="ah-label">
               First name
               <Input
-                className="mt-1.5"
+                className="mt-1"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
               />
@@ -265,13 +264,13 @@ function EditUserModal({
             <label className="ah-label">
               Last name
               <Input
-                className="mt-1.5"
+                className="mt-1"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
               />
             </label>
           </div>
-          <label className="flex cursor-pointer items-center gap-2.5 text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
             <input
               type="checkbox"
               className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"

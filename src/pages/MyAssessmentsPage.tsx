@@ -1,13 +1,28 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Badge, Button, Card, EmptyState, PageHeader, Skeleton } from '@/components/ui';
-import { useMyAssignmentsQuery } from '@/hooks/api/useAssessments';
+import { useMyAssignmentsQuery, type ExamKind } from '@/hooks/api/useAssessments';
 import { useAcademicYearsQuery } from '@/hooks/api/useAcademicYears';
 
 const selectClass =
   'rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-900';
 
-export function MyAssessmentsPage() {
+function formatDateTime(iso: string | null | undefined) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+export function MyAssessmentsPage({ kind = 'assessment' }: { kind?: ExamKind }) {
+  const online = kind === 'online_exam';
+  const mine = online ? '/my-online-exams' : '/my-assessments';
   const { data: years = [], isLoading: yearsLoading } = useAcademicYearsQuery();
   const sortedYears = useMemo(
     () => [...years].sort((a, b) => b.label.localeCompare(a.label)),
@@ -23,14 +38,19 @@ export function MyAssessmentsPage() {
   }, [sortedYears, yearId]);
 
   const queryYear = yearId || undefined;
-  const { data, isLoading } = useMyAssignmentsQuery(queryYear);
+  const { data, isLoading } = useMyAssignmentsQuery(queryYear, kind);
   const assignments = data?.assignments ?? [];
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="My assessments"
-        description="Assessments for the selected academic year. Switch years to see past work."
+        eyebrow="Student"
+        title={online ? 'Online exams' : 'My assessments'}
+        description={
+          online
+            ? 'CBT exams open in fullscreen. Leaving fullscreen three times submits the exam. Results appear after your teacher announces them.'
+            : 'Assessments you can attempt online. Results appear after your teacher announces them.'
+        }
         actions={
           yearsLoading ? (
             <Skeleton className="h-10 w-44" />
@@ -56,60 +76,79 @@ export function MyAssessmentsPage() {
       />
 
       {isLoading || (sortedYears.length > 0 && !yearId) ? (
-        <div className="space-y-3">
-          <Skeleton className="h-20" />
-          <Skeleton className="h-20" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Skeleton className="h-48" />
+          <Skeleton className="h-48" />
         </div>
       ) : assignments.length === 0 ? (
         <Card className="p-0">
           <EmptyState
-            title="No assessments yet"
+            title={online ? 'No online exams yet' : 'No assessments yet'}
             description={
               yearId === 'all'
-                ? 'When your teacher assigns a quiz, it will show up here.'
-                : 'No assessments for this academic year. Try another year or All years.'
+                ? online
+                  ? 'When your teacher assigns an online exam, it will show up here.'
+                  : 'When your teacher assigns an assessment, it will show up here.'
+                : online
+                  ? 'No online exams for this academic year. Try another year or All years.'
+                  : 'No assessments for this academic year. Try another year or All years.'
             }
           />
         </Card>
       ) : (
-        <div className="space-y-3">
-          {assignments.map((a) => (
-            <Card
-              key={a.id}
-              className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="font-semibold text-slate-900 dark:text-white truncate">
-                    {a.assessmentTitle}
-                  </h3>
-                  <Badge tone={a.status === 'submitted' ? 'success' : 'warning'}>
-                    {a.status === 'submitted' ? `Score: ${a.score}/${a.maxScore}` : 'Pending'}
+        <div className="grid gap-4 sm:grid-cols-2">
+          {assignments.map((a) => {
+            const pending = a.status === 'pending';
+            const dueLabel = formatDateTime(a.dueDate || a.endAt);
+            const startLabel = formatDateTime(a.startAt);
+            const submittedLabel = formatDateTime(a.submittedAt);
+            const qCount = a.questionCount ?? 0;
+            const marks = a.totalMarks ?? a.maxScore ?? 0;
+            const duration = a.durationMinutes ?? 60;
+
+            return (
+              <Card key={a.id} className="flex flex-col p-5">
+                <div className="mb-2 flex flex-wrap gap-2">
+                  <Badge tone={pending ? 'warning' : a.resultsVisible ? 'success' : 'warning'}>
+                    {pending
+                      ? 'Pending'
+                      : a.resultsVisible
+                        ? 'Results out'
+                        : 'Submitted · results held'}
                   </Badge>
                   {yearId === 'all' && a.academicYearLabel ? (
                     <Badge tone="neutral">{a.academicYearLabel}</Badge>
                   ) : null}
+                  {startLabel ? <Badge tone="neutral">Starts {startLabel}</Badge> : null}
+                  {dueLabel ? <Badge tone="warning">Due {dueLabel}</Badge> : null}
                 </div>
-                {a.dueDate && (
-                  <p className="mt-1 text-xs text-slate-500">
-                    Due: {new Date(a.dueDate).toLocaleString()}
-                  </p>
-                )}
-                {a.status === 'submitted' && a.submittedAt && (
-                  <p className="mt-1 text-xs text-slate-500">
-                    Submitted: {new Date(a.submittedAt).toLocaleString()}
-                  </p>
-                )}
-              </div>
-              <div className="shrink-0">
-                <Link to={`/my-assessments/${a.id}`}>
-                  <Button size="sm" variant={a.status === 'pending' ? 'primary' : 'secondary'}>
-                    {a.status === 'pending' ? 'Start' : 'View results'}
-                  </Button>
-                </Link>
-              </div>
-            </Card>
-          ))}
+
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                  {a.assessmentTitle || 'Assessment'}
+                </h3>
+                {a.assessmentDescription ? (
+                  <p className="mt-1 line-clamp-2 text-sm text-slate-500">{a.assessmentDescription}</p>
+                ) : null}
+
+                <p className="mt-3 text-xs text-slate-500">
+                  {qCount} question{qCount !== 1 ? 's' : ''} · {marks} mark{marks !== 1 ? 's' : ''} ·{' '}
+                  {duration} min
+                  {!pending && a.resultsVisible && a.score != null
+                    ? ` · Score ${a.score}/${a.maxScore}`
+                    : ''}
+                  {submittedLabel ? ` · Submitted ${submittedLabel}` : ''}
+                </p>
+
+                <div className="mt-auto flex flex-wrap gap-2 pt-4">
+                  <Link to={`${mine}/${a.id}`}>
+                    <Button size="sm" variant={pending ? 'primary' : 'secondary'}>
+                      {pending ? 'Start' : a.resultsVisible ? 'View results' : 'View submission'}
+                    </Button>
+                  </Link>
+                </div>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

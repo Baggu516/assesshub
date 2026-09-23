@@ -10,6 +10,7 @@ import { FormField } from '@/components/ui/FormField';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { PERMISSIONS } from '@/constants/permissions';
 import { formatPermissionList } from '@/constants/permissionLabels';
 import {
@@ -65,7 +66,7 @@ function AddTeamMemberModal({
       open={open}
       onClose={onClose}
       title="Add student"
-      description="Create with a password, or send an email invite. Assign them to a class under Classes."
+      description="Create with password, or send an email invite."
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>
@@ -80,7 +81,7 @@ function AddTeamMemberModal({
         </>
       }
     >
-      <div className="space-y-4">
+      <div className="space-y-3">
         <FormField label="Email" htmlFor="add-student-email" required>
           <Input
             id="add-student-email"
@@ -92,15 +93,9 @@ function AddTeamMemberModal({
             onChange={(e) => setMember((m) => ({ ...m, email: e.target.value }))}
           />
         </FormField>
-        <FormField
-          label="Password"
-          htmlFor="add-student-password"
-          required
-          hint="Required to create an account · at least 8 characters"
-        >
-          <Input
+        <FormField label="Password" htmlFor="add-student-password" required hint="Min. 8 characters to create">
+          <PasswordInput
             id="add-student-password"
-            type="password"
             autoComplete="new-password"
             placeholder="••••••••"
             value={member.password}
@@ -190,19 +185,18 @@ function EditUserModal({
       open={open}
       onClose={onClose}
       title="Edit student"
-      description="Update account details and permissions."
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
           <Button type="submit" form="edit-student-form" disabled={saving}>
-            {saving ? 'Saving…' : 'Save changes'}
+            {saving ? 'Saving…' : 'Save'}
           </Button>
         </>
       }
     >
-      <form id="edit-student-form" onSubmit={handleSubmit} className="space-y-4">
+      <form id="edit-student-form" onSubmit={handleSubmit} className="space-y-3">
         <FormField label="Email" htmlFor="edit-student-email" required>
           <Input
             id="edit-student-email"
@@ -229,7 +223,7 @@ function EditUserModal({
             />
           </FormField>
         </div>
-        <label className="flex cursor-pointer items-center gap-2.5 text-sm font-medium text-slate-700 dark:text-slate-300">
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
           <input
             type="checkbox"
             className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
@@ -238,14 +232,9 @@ function EditUserModal({
           />
           Active account
         </label>
-        <FormField
-          label="New password"
-          htmlFor="edit-student-password"
-          hint="Leave blank to keep the current password · min. 8 characters when set"
-        >
-          <Input
+        <FormField label="New password" htmlFor="edit-student-password" hint="Leave blank to keep current">
+          <PasswordInput
             id="edit-student-password"
-            type="password"
             autoComplete="new-password"
             placeholder="••••••••"
             value={newPassword}
@@ -254,30 +243,24 @@ function EditUserModal({
         </FormField>
 
         {canEditPermissionsSection && catalog && catalog.length > 0 && (
-          <div className="border-t border-slate-100 pt-4 dark:border-slate-800">
-            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Permissions
-            </h4>
-            <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
+          <div className="border-t border-slate-100 pt-3 dark:border-slate-800">
+            <p className="mb-1.5 text-xs font-medium text-slate-500">Permissions</p>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 sm:grid-cols-3">
               {catalog
                 .filter((p) => assignableKeys.has(p.key))
                 .map((p) => (
                   <label
                     key={p.key}
-                    className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-slate-200 p-2.5 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800/50"
+                    title={p.key}
+                    className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1.5 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60"
                   >
                     <input
                       type="checkbox"
                       checked={selected.has(p.key)}
                       onChange={() => toggle(p.key)}
-                      className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                      className="h-4 w-4 shrink-0 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
                     />
-                    <span>
-                      <span className="text-sm font-medium text-slate-800 dark:text-slate-100">
-                        {p.label}
-                      </span>
-                      <span className="block font-mono text-xs text-slate-500">{p.key}</span>
-                    </span>
+                    <span className="truncate text-sm text-slate-800 dark:text-slate-100">{p.label}</span>
                   </label>
                 ))}
             </div>
@@ -398,10 +381,16 @@ export function UsersPage() {
         password: pw,
         firstName: member.firstName,
         lastName: member.lastName,
-      })) as { user?: unknown; generatedPassword?: string };
+      })) as { user?: { registrationId?: string }; generatedPassword?: string };
+      const rid = res?.user?.registrationId;
       const gen = res?.generatedPassword;
-      if (gen) toast.success(`User created. Temporary password: ${gen}`);
-      else toast.success('User created');
+      toast.success(
+        rid
+          ? `Student created · ID ${rid}${gen ? ` · temp password sent by email` : ''}`
+          : gen
+            ? `User created. Temporary password: ${gen}`
+            : 'User created'
+      );
       setMember({ email: '', password: '', firstName: '', lastName: '' });
       setAddModalOpen(false);
     } catch (err: unknown) {
@@ -636,6 +625,11 @@ export function UsersPage() {
                             <code className="truncate font-mono text-xs font-medium text-slate-600 dark:text-slate-400">
                               {u.email}
                             </code>
+                            {u.registrationId ? (
+                              <p className="mt-0.5 font-mono text-[11px] font-semibold tracking-wide text-brand-700 dark:text-brand-300">
+                                ID {u.registrationId}
+                              </p>
+                            ) : null}
                           </div>
                         </div>
                       </td>

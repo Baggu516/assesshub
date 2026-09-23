@@ -39,6 +39,17 @@ export function useClassesQuery(enabled = true, academicYearId?: string | null) 
   });
 }
 
+export function useClassQuery(classId?: string | null) {
+  return useQuery({
+    queryKey: ['classes', 'one', classId],
+    enabled: !!classId,
+    queryFn: async () => {
+      const { data } = await api.get<{ class: SchoolClass }>(`/classes/${classId}`);
+      return data.class;
+    },
+  });
+}
+
 export function useClassOptionsQuery(enabled = true) {
   return useQuery({
     queryKey: ['classes', 'options'],

@@ -5,6 +5,7 @@ export type HierarchyRole = 'admin' | 'subordinate' | 'user';
 export interface AuthUser {
   id: string;
   email: string;
+  registrationId?: string | null;
   firstName: string;
   lastName: string;
   hierarchyRole: HierarchyRole;

@@ -109,19 +109,18 @@ function GroupFormModal({
       onClose={onClose}
       size="lg"
       title={initial ? 'Edit group' : 'Create student group'}
-      description="Add students to a group. Assign assessments to the whole group at once."
       footer={
         <>
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancel
           </Button>
           <Button type="submit" form="student-group-form" disabled={!canSave || saving}>
-            {saving ? 'Saving…' : initial ? 'Save changes' : 'Create group'}
+            {saving ? 'Saving…' : initial ? 'Save' : 'Create'}
           </Button>
         </>
       }
     >
-      <form id="student-group-form" onSubmit={handleSubmit} className="space-y-4">
+      <form id="student-group-form" onSubmit={handleSubmit} className="space-y-3">
         <FormField label="Group name" htmlFor="group-name" required>
           <Input
             id="group-name"
@@ -131,21 +130,21 @@ function GroupFormModal({
             autoFocus
           />
         </FormField>
-        <FormField label="Description" htmlFor="group-description" hint="Optional">
+        <FormField label="Description" htmlFor="group-description">
           <Textarea
             id="group-description"
-            placeholder="What this group is for…"
-            className="min-h-[64px] rounded-xl"
+            placeholder="Optional"
+            className="min-h-[56px] rounded-lg"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
         </FormField>
 
         <div>
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
+          <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-medium text-slate-500">
               Students <span className="text-rose-500">*</span>
-              <span className="ml-1 font-normal text-slate-400">({selected.size} selected)</span>
+              <span className="ml-1 font-normal text-slate-400">({selected.size})</span>
             </p>
             {visibleStudents.length > 0 && (
               <div className="flex gap-2">
@@ -168,12 +167,12 @@ function GroupFormModal({
           </div>
 
           {classTabs.length > 0 && (
-            <div className="mb-2 flex gap-1 overflow-x-auto">
+            <div className="mb-1.5 flex gap-1 overflow-x-auto">
               <button
                 type="button"
                 onClick={() => setClassTab('all')}
                 className={clsx(
-                  'shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors',
+                  'shrink-0 rounded-md px-2 py-1 text-xs font-medium transition-colors',
                   classTab === 'all'
                     ? 'bg-brand-50 text-brand-800 dark:bg-brand-500/15 dark:text-brand-200'
                     : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -187,7 +186,7 @@ function GroupFormModal({
                   type="button"
                   onClick={() => setClassTab(c.id)}
                   className={clsx(
-                    'shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors',
+                    'shrink-0 rounded-md px-2 py-1 text-xs font-medium transition-colors',
                     classTab === c.id
                       ? 'bg-brand-50 text-brand-800 dark:bg-brand-500/15 dark:text-brand-200'
                       : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -202,15 +201,11 @@ function GroupFormModal({
           {isLoading ? (
             <Skeleton className="h-24" />
           ) : students.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-slate-200 px-3 py-4 text-sm text-slate-500 dark:border-slate-700">
-              No students in your classes yet. Ask admin to enroll them under Classes.
-            </p>
+            <p className="py-3 text-sm text-slate-500">No students in your classes yet.</p>
           ) : visibleStudents.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-slate-200 px-3 py-4 text-sm text-slate-500 dark:border-slate-700">
-              No students in this class.
-            </p>
+            <p className="py-3 text-sm text-slate-500">No students in this class.</p>
           ) : (
-            <div className="max-h-56 space-y-1.5 overflow-y-auto rounded-xl border border-slate-200 p-2 dark:border-slate-700">
+            <div className="max-h-52 space-y-0.5 overflow-y-auto rounded-lg border border-slate-200 p-1 dark:border-slate-700">
               {visibleStudents.map((s: AssessmentAssignee) => {
                 const checked = selected.has(s.id);
                 return (
@@ -219,15 +214,15 @@ function GroupFormModal({
                     type="button"
                     onClick={() => toggle(s.id)}
                     className={clsx(
-                      'flex w-full items-start gap-3 rounded-lg border px-2.5 py-2 text-left transition-colors',
+                      'flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors',
                       checked
-                        ? 'border-brand-400 bg-brand-50/70 dark:border-brand-500/40 dark:bg-brand-500/10'
-                        : 'border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                        ? 'bg-brand-50 dark:bg-brand-500/10'
+                        : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
                     )}
                   >
                     <span
                       className={clsx(
-                        'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border-2',
+                        'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border',
                         checked
                           ? 'border-brand-600 bg-brand-600 text-white'
                           : 'border-slate-300 dark:border-slate-500'
@@ -235,7 +230,7 @@ function GroupFormModal({
                       aria-hidden
                     >
                       {checked && (
-                        <svg className="h-2.5 w-2.5" viewBox="0 0 12 12" fill="none">
+                        <svg className="h-2 w-2" viewBox="0 0 12 12" fill="none">
                           <path
                             d="M2 6l3 3 5-5"
                             stroke="currentColor"
@@ -247,20 +242,17 @@ function GroupFormModal({
                       )}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-medium text-slate-900 dark:text-white">
+                      <span className="block truncate text-sm text-slate-900 dark:text-white">
                         {s.label}
                       </span>
-                      <span className="block text-xs text-slate-500">{s.email}</span>
-                      {classTab === 'all' && (s.classes?.length ?? 0) > 0 && (
-                        <span className="mt-1 flex flex-wrap gap-1">
-                          {s.classes!.map((c) => (
-                            <Badge key={c.id} tone="brand" className="!py-0.5 !text-[10px]">
-                              {c.name}
-                            </Badge>
-                          ))}
-                        </span>
-                      )}
+                      <span className="block truncate text-[11px] text-slate-400">{s.email}</span>
                     </span>
+                    {classTab === 'all' && (s.classes?.length ?? 0) > 0 ? (
+                      <span className="shrink-0 text-[10px] text-slate-400">
+                        {s.classes![0].name}
+                        {(s.classes?.length ?? 0) > 1 ? ` +${s.classes!.length - 1}` : ''}
+                      </span>
+                    ) : null}
                   </button>
                 );
               })}

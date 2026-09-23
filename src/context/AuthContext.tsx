@@ -17,7 +17,7 @@ import { useTenant } from './TenantContext';
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, tenantOverride?: string) => Promise<void>;
   logout: () => Promise<void>;
   /** Apply tokens + tenant subdomain (e.g. after platform creates org with admin). */
   applyTenantSession: (payload: TenantSessionPayload) => void;
@@ -110,24 +110,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [subdomain]);
 
   const login = useCallback(
-    async (email: string, password: string) => {
-      if (!subdomain) {
+    async (email: string, password: string, tenantOverride?: string) => {
+      const tenant = (tenantOverride || subdomain || '').trim().toLowerCase();
+      if (!tenant) {
         toast.error('Enter your organization subdomain first.');
         throw new Error('missing_tenant');
       }
+      if (tenant !== subdomain) setSubdomain(tenant);
       const { data } = await api.post<{
         accessToken: string;
         refreshToken: string;
         user: AuthUser;
-      }>('/auth/login', { email, password });
+      }>(
+        '/auth/login',
+        { email, password },
+        { headers: { 'X-Tenant-Subdomain': tenant } }
+      );
       setTokens(data.accessToken, data.refreshToken);
       setUser(data.user);
-      setCachedUser(subdomain, data.user);
+      setCachedUser(tenant, data.user);
       queryClient.removeQueries({ queryKey: ['users'] });
       toast.success('Welcome back');
       navigate('/');
     },
-    [subdomain, navigate]
+    [subdomain, setSubdomain, navigate]
   );
 
   const logout = useCallback(async () => {

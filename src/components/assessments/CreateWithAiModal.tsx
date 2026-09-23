@@ -84,7 +84,7 @@ export function CreateWithAiModal({ open, onClose, onGenerated }: CreateWithAiMo
       open={open}
       onClose={handleClose}
       title="Create assessment with AI"
-      description="Describe the topic, level, and focus. We’ll draft questions you can edit before saving."
+      description="Describe topic and level — edit questions before saving."
       footer={
         <>
           <Button type="button" variant="secondary" onClick={handleClose} disabled={loading}>
@@ -95,21 +95,21 @@ export function CreateWithAiModal({ open, onClose, onGenerated }: CreateWithAiMo
             onClick={handleGenerate}
             disabled={prompt.trim().length < 8 || loading}
           >
-            {loading ? 'Generating…' : 'Generate questions'}
+            {loading ? 'Generating…' : 'Generate'}
           </Button>
         </>
       }
     >
-      <div className="space-y-4">
+      <div className="space-y-3">
         <FormField
           label="Prompt"
           htmlFor="ai-assessment-prompt"
           required
-          hint="Example: Create a 5-question quiz on nursing vital signs for first-year students."
+          hint="e.g. 5-question quiz on nursing vital signs for first-year students"
         >
           <Textarea
             id="ai-assessment-prompt"
-            className="min-h-[140px] rounded-xl"
+            className="min-h-[120px] rounded-lg"
             placeholder="What should this assessment cover?"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
@@ -138,13 +138,13 @@ export function CreateWithAiModal({ open, onClose, onGenerated }: CreateWithAiMo
         </FormField>
 
         {error ? (
-          <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+          <p className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
             {error}
           </p>
         ) : null}
 
         {loading ? (
-          <p className="text-xs text-slate-500">This can take a little while depending on the AI provider…</p>
+          <p className="text-[11px] text-slate-400">This can take a moment…</p>
         ) : null}
       </div>
     </Modal>

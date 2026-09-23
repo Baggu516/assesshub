@@ -5,8 +5,9 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['"Plus Jakarta Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        display: ['"Plus Jakarta Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        sans: ['Manrope', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        display: ['Outfit', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        serif: ['Fraunces', 'ui-serif', 'Georgia', 'serif'],
         mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       colors: {
@@ -53,6 +54,18 @@ export default {
           '0%': { opacity: '0', transform: 'translateY(8px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
+        drift: {
+          '0%, 100%': { transform: 'translate(0, 0) scale(1)' },
+          '50%': { transform: 'translate(12px, -18px) scale(1.04)' },
+        },
+        'drift-slow': {
+          '0%, 100%': { transform: 'translate(0, 0)' },
+          '50%': { transform: 'translate(-16px, 10px)' },
+        },
+        'rise-in': {
+          '0%': { opacity: '0', transform: 'translateY(18px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
       },
       animation: {
         'fade-up': 'fade-up 0.35s ease-out both',
@@ -60,6 +73,9 @@ export default {
         'panel-up': 'panel-up 0.28s cubic-bezier(0.22, 1, 0.36, 1) both',
         'soft-pulse': 'soft-pulse 2.4s ease-out infinite',
         'msg-in': 'msg-in 0.3s ease-out both',
+        drift: 'drift 14s ease-in-out infinite',
+        'drift-slow': 'drift-slow 18s ease-in-out infinite',
+        'rise-in': 'rise-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) both',
       },
       backgroundImage: {
         'mesh-light':

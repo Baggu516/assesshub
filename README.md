@@ -1,6 +1,6 @@
-﻿# AssessHub Web
+﻿# ClassTrio Web
 
-Vite + React + TypeScript client for the AssessHub API.
+Vite + React + TypeScript client for the ClassTrio API.
 
 ```bash
 npm install

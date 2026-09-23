@@ -3,6 +3,10 @@ import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/Card';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/Button';
+import { FormField } from '@/components/ui/FormField';
+import { Input } from '@/components/ui/Input';
+import { Modal } from '@/components/ui/Modal';
+import { Textarea } from '@/components/ui/Textarea';
 import { Skeleton } from '@/components/ui/Spinner';
 import {
   useClassMastersQuery,
@@ -10,13 +14,18 @@ import {
   type ClassMaster,
 } from '@/hooks/api/useClassMasters';
 
+const selectClass =
+  'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100';
+
 function MasterFormModal({
+  open,
   initial,
   masters,
   onClose,
   onSave,
   saving,
 }: {
+  open: boolean;
   initial?: ClassMaster | null;
   masters: ClassMaster[];
   onClose: () => void;
@@ -52,70 +61,67 @@ function MasterFormModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" role="dialog">
-      <Card className="max-w-md w-full">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
-              {initial ? 'Edit class master' : 'New class master'}
-            </h3>
-            <p className="text-xs text-slate-500 mt-1">
-              Stable grade names reused every year (e.g. Grade 5). Set “promotes to” for auto-suggestions.
-            </p>
-          </div>
-          <button type="button" onClick={onClose} className="text-slate-500 hover:text-slate-800 text-sm">
-            Close
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-          <input
-            placeholder="Name * (e.g. Grade 5)"
-            className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm"
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={initial ? 'Edit class master' : 'New class master'}
+      description="Stable grade names reused each year."
+      footer={
+        <>
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="master-form" disabled={!canSave || saving}>
+            {saving ? 'Saving…' : initial ? 'Save' : 'Create'}
+          </Button>
+        </>
+      }
+    >
+      <form id="master-form" onSubmit={handleSubmit} className="space-y-3">
+        <FormField label="Name" htmlFor="master-name" required>
+          <Input
+            id="master-name"
+            placeholder="e.g. Grade 5"
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
-          <textarea
-            placeholder="Description (optional)"
-            className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm min-h-[60px]"
+        </FormField>
+        <FormField label="Description" htmlFor="master-description">
+          <Textarea
+            id="master-description"
+            placeholder="Optional"
+            className="min-h-[56px] rounded-lg"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
-          <label className="block text-xs text-slate-500 space-y-1">
-            <span>Promotes to (next year)</span>
+        </FormField>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <FormField label="Promotes to" htmlFor="master-next">
             <select
-              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-900"
+              id="master-next"
+              className={selectClass}
               value={nextClassMasterId}
               onChange={(e) => setNextClassMasterId(e.target.value)}
             >
-              <option value="">Same grade (retain / no next)</option>
+              <option value="">Same grade / none</option>
               {nextOptions.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.name}
                 </option>
               ))}
             </select>
-          </label>
-          <label className="block text-xs text-slate-500 space-y-1">
-            <span>Sort order</span>
-            <input
+          </FormField>
+          <FormField label="Sort order" htmlFor="master-sort">
+            <Input
+              id="master-sort"
               type="number"
-              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm"
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value)}
             />
-          </label>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="secondary" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={!canSave || saving}>
-              {saving ? 'Saving…' : initial ? 'Save' : 'Create'}
-            </Button>
-          </div>
-        </form>
-      </Card>
-    </div>
+          </FormField>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
@@ -218,19 +224,18 @@ export function ClassMastersPage() {
         </div>
       )}
 
-      {showForm ? (
-        <MasterFormModal
-          key={editTarget?.id || 'new'}
-          initial={editTarget}
-          masters={masters}
-          onClose={() => {
-            setShowForm(false);
-            setEditTarget(null);
-          }}
-          onSave={handleSave}
-          saving={create.isPending || update.isPending}
-        />
-      ) : null}
+      <MasterFormModal
+        key={editTarget?.id || 'new'}
+        open={showForm}
+        initial={editTarget}
+        masters={masters}
+        onClose={() => {
+          setShowForm(false);
+          setEditTarget(null);
+        }}
+        onSave={handleSave}
+        saving={create.isPending || update.isPending}
+      />
     </div>
   );
 }

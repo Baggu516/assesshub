@@ -7,6 +7,7 @@ import { FormField } from '@/components/ui/FormField';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { useAuth } from '@/context/AuthContext';
 import { PERMISSIONS } from '@/constants/permissions';
 import { formatPermissionList } from '@/constants/permissionLabels';
@@ -49,7 +50,6 @@ function InviteSubordinateModal({
       open={open}
       onClose={onClose}
       title="Add teacher"
-      description="Create a team lead account. All fields are required."
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
@@ -68,7 +68,7 @@ function InviteSubordinateModal({
           if (!canCreate || saving) return;
           onSubmit(e);
         }}
-        className="space-y-4"
+        className="space-y-3"
       >
         <FormField label="Email" htmlFor="invite-email" required>
           <Input
@@ -81,15 +81,9 @@ function InviteSubordinateModal({
             onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
           />
         </FormField>
-        <FormField
-          label="Password"
-          htmlFor="invite-password"
-          required
-          hint="At least 8 characters"
-        >
-          <Input
+        <FormField label="Password" htmlFor="invite-password" required hint="Min. 8 characters">
+          <PasswordInput
             id="invite-password"
-            type="password"
             autoComplete="new-password"
             placeholder="••••••••"
             value={form.password}
@@ -178,19 +172,18 @@ function SubordinateEditModal({
       open={open}
       onClose={onClose}
       title="Edit teacher"
-      description="Update account details and permissions for this team lead."
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
           <Button type="submit" form="edit-teacher-form" disabled={saving}>
-            {saving ? 'Saving…' : 'Save changes'}
+            {saving ? 'Saving…' : 'Save'}
           </Button>
         </>
       }
     >
-      <form id="edit-teacher-form" onSubmit={handleSubmit} className="space-y-4">
+      <form id="edit-teacher-form" onSubmit={handleSubmit} className="space-y-3">
         <FormField label="Email" htmlFor="edit-email" required>
           <Input
             id="edit-email"
@@ -217,7 +210,7 @@ function SubordinateEditModal({
             />
           </FormField>
         </div>
-        <label className="flex cursor-pointer items-center gap-2.5 text-sm font-medium text-slate-700 dark:text-slate-300">
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
           <input
             type="checkbox"
             className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
@@ -226,14 +219,9 @@ function SubordinateEditModal({
           />
           Active account
         </label>
-        <FormField
-          label="New password"
-          htmlFor="edit-password"
-          hint="Leave blank to keep the current password"
-        >
-          <Input
+        <FormField label="New password" htmlFor="edit-password" hint="Leave blank to keep current">
+          <PasswordInput
             id="edit-password"
-            type="password"
             autoComplete="new-password"
             placeholder="••••••••"
             value={newPassword}
@@ -242,30 +230,24 @@ function SubordinateEditModal({
         </FormField>
 
         {canEditPermissionsSection && catalog && catalog.length > 0 && (
-          <div className="border-t border-slate-100 pt-4 dark:border-slate-800">
-            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Permissions
-            </h4>
-            <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
+          <div className="border-t border-slate-100 pt-3 dark:border-slate-800">
+            <p className="mb-1.5 text-xs font-medium text-slate-500">Permissions</p>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 sm:grid-cols-3">
               {catalog
                 .filter((p) => assignableKeys.has(p.key))
                 .map((p) => (
                   <label
                     key={p.key}
-                    className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-slate-200 p-2.5 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800/50"
+                    title={p.key}
+                    className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1.5 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60"
                   >
                     <input
                       type="checkbox"
                       checked={selected.has(p.key)}
                       onChange={() => toggle(p.key)}
-                      className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                      className="h-4 w-4 shrink-0 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
                     />
-                    <span>
-                      <span className="text-sm font-medium text-slate-800 dark:text-slate-100">
-                        {p.label}
-                      </span>
-                      <span className="block font-mono text-xs text-slate-500">{p.key}</span>
-                    </span>
+                    <span className="truncate text-sm text-slate-800 dark:text-slate-100">{p.label}</span>
                   </label>
                 ))}
             </div>
@@ -354,12 +336,13 @@ export function SubordinatesPage() {
       return;
     }
     try {
-      await createSubordinate.mutateAsync({
+      const res = (await createSubordinate.mutateAsync({
         ...form,
         email,
         password: pw,
-      });
-      toast.success('Subordinate created');
+      })) as { user?: { registrationId?: string } };
+      const rid = res?.user?.registrationId;
+      toast.success(rid ? `Teacher created · ID ${rid}` : 'Subordinate created');
       setForm({ email: '', password: '', firstName: '', lastName: '' });
       setInviteOpen(false);
       refetch();
@@ -526,6 +509,11 @@ export function SubordinatesPage() {
                             <code className="truncate font-mono text-xs font-medium text-slate-600 dark:text-slate-400">
                               {u.email}
                             </code>
+                            {u.registrationId ? (
+                              <p className="mt-0.5 font-mono text-[11px] font-semibold tracking-wide text-brand-700 dark:text-brand-300">
+                                ID {u.registrationId}
+                              </p>
+                            ) : null}
                           </div>
                         </div>
                       </td>

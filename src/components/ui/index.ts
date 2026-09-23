@@ -4,6 +4,7 @@ export { Card, CardStat } from './Card';
 export { EmptyState } from './EmptyState';
 export { FormField } from './FormField';
 export { Input } from './Input';
+export { PasswordInput, type PasswordInputProps } from './PasswordInput';
 export { Modal } from './Modal';
 export { PageHeader } from './PageHeader';
 export { Select } from './Select';

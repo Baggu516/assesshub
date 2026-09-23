@@ -1,293 +1,61 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
-import { Badge, Button, Card, Input, Skeleton } from '@/components/ui';
+import { Badge, Card, Skeleton } from '@/components/ui';
+import { AssessmentFormRunner } from '@/components/assessments/AssessmentFormRunner';
+import { CbtAttemptRunner } from '@/components/assessments/CbtAttemptRunner';
+import { useAuth } from '@/context/AuthContext';
 import {
+  recordFullscreenExit,
   useAssignmentQuery,
   useAssessmentMutations,
   type AssessmentQuestion,
+  type ExamKind,
 } from '@/hooks/api/useAssessments';
 
-type AnswerState = {
-  selectedOptionIds: string[];
-  textAnswer: string;
-};
-
-function OptionRow({
-  selected,
-  disabled,
-  onSelect,
-  children,
-  correctHint,
-}: {
-  selected: boolean;
-  disabled: boolean;
-  onSelect: () => void;
-  children: React.ReactNode;
-  correctHint?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onSelect}
-      className={clsx(
-        'flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm transition-colors',
-        selected
-          ? 'border-brand-500 bg-brand-50/80 dark:border-brand-500 dark:bg-brand-500/10'
-          : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-600 dark:bg-slate-950 dark:hover:border-slate-500',
-        disabled && 'cursor-default opacity-90 hover:border-slate-200 dark:hover:border-slate-600'
-      )}
-    >
-      <span
-        className={clsx(
-          'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2',
-          selected ? 'border-brand-600 bg-brand-600' : 'border-slate-300 dark:border-slate-500'
-        )}
-        aria-hidden
-      >
-        {selected && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
-      </span>
-      <span className="flex-1 text-slate-800 dark:text-slate-100">{children}</span>
-      {correctHint && (
-        <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">(correct)</span>
-      )}
-    </button>
-  );
-}
-
-function CheckboxRow({
-  selected,
-  disabled,
-  onToggle,
-  children,
-}: {
-  selected: boolean;
-  disabled: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onToggle}
-      className={clsx(
-        'flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm transition-colors',
-        selected
-          ? 'border-brand-500 bg-brand-50/80 dark:border-brand-500 dark:bg-brand-500/10'
-          : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-600 dark:bg-slate-950 dark:hover:border-slate-500',
-        disabled && 'cursor-default opacity-90 hover:border-slate-200 dark:hover:border-slate-600'
-      )}
-    >
-      <span
-        className={clsx(
-          'flex h-4 w-4 shrink-0 items-center justify-center rounded border-2',
-          selected
-            ? 'border-brand-600 bg-brand-600 text-white'
-            : 'border-slate-300 dark:border-slate-500'
-        )}
-        aria-hidden
-      >
-        {selected && (
-          <svg className="h-2.5 w-2.5" viewBox="0 0 12 12" fill="none" aria-hidden>
-            <path
-              d="M2 6l3 3 5-5"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        )}
-      </span>
-      <span className="flex-1 text-slate-800 dark:text-slate-100">{children}</span>
-    </button>
-  );
-}
-
-function QuestionBlock({
-  question,
-  index,
-  answer,
-  onChange,
-  readOnly,
-  showResult,
-}: {
-  question: AssessmentQuestion;
-  index: number;
-  answer: AnswerState;
-  onChange: (a: AnswerState) => void;
-  readOnly: boolean;
-  showResult?: { isCorrect?: boolean; pointsEarned?: number };
-}) {
-  return (
-    <div className="relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
-      <div
-        className={clsx(
-          'absolute inset-y-0 left-0 w-1',
-          showResult
-            ? showResult.isCorrect
-              ? 'bg-emerald-500'
-              : 'bg-rose-500'
-            : 'bg-brand-500'
-        )}
-        aria-hidden
-      />
-      <div className="space-y-3 p-4 pl-5 sm:p-5 sm:pl-6">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-2.5">
-            <span className="inline-flex h-7 min-w-7 shrink-0 items-center justify-center rounded-lg bg-slate-900 px-2 text-xs font-bold text-white dark:bg-white dark:text-slate-900">
-              {index + 1}
-            </span>
-            <p className="pt-0.5 text-sm font-semibold leading-snug text-slate-900 dark:text-white">
-              {question.prompt}
-            </p>
-          </div>
-          <Badge tone="neutral" className="shrink-0">
-            {question.points} pt{question.points !== 1 ? 's' : ''}
-          </Badge>
-        </div>
-
-        {showResult && (
-          <Badge tone={showResult.isCorrect ? 'success' : 'danger'}>
-            {showResult.isCorrect ? `Correct (+${showResult.pointsEarned})` : 'Incorrect'}
-          </Badge>
-        )}
-
-        {question.type === 'single_select' && (
-          <div className="space-y-2" role="radiogroup" aria-label={`Question ${index + 1}`}>
-            {question.options.map((opt) => (
-              <OptionRow
-                key={opt.id}
-                selected={answer.selectedOptionIds[0] === opt.id}
-                disabled={readOnly}
-                onSelect={() => onChange({ ...answer, selectedOptionIds: opt.id ? [opt.id] : [] })}
-                correctHint={Boolean(readOnly && showResult && opt.isCorrect)}
-              >
-                {opt.text}
-              </OptionRow>
-            ))}
-          </div>
-        )}
-
-        {question.type === 'multi_select' && (
-          <div className="space-y-2" role="group" aria-label={`Question ${index + 1}`}>
-            {question.options.map((opt) => (
-              <CheckboxRow
-                key={opt.id}
-                selected={answer.selectedOptionIds.includes(opt.id || '')}
-                disabled={readOnly}
-                onToggle={() => {
-                  const id = opt.id || '';
-                  const next = answer.selectedOptionIds.includes(id)
-                    ? answer.selectedOptionIds.filter((x) => x !== id)
-                    : [...answer.selectedOptionIds, id];
-                  onChange({ ...answer, selectedOptionIds: next });
-                }}
-              >
-                {opt.text}
-              </CheckboxRow>
-            ))}
-          </div>
-        )}
-
-        {question.type === 'short_answer' && (
-          <div className="max-w-sm space-y-1.5">
-            <Input
-              type="text"
-              disabled={readOnly}
-              placeholder="1–2 words"
-              maxLength={100}
-              value={answer.textAnswer}
-              onChange={(e) => onChange({ ...answer, textAnswer: e.target.value })}
-            />
-            {readOnly && showResult && question.acceptedAnswers?.length ? (
-              <p className="text-xs text-slate-500">Accepted: {question.acceptedAnswers.join(', ')}</p>
-            ) : null}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-export function TakeAssessmentPage() {
+export function TakeAssessmentPage({ kind = 'assessment' }: { kind?: ExamKind }) {
+  const online = kind === 'online_exam';
+  const mine = online ? '/my-online-exams' : '/my-assessments';
   const { assignmentId } = useParams<{ assignmentId: string }>();
   const navigate = useNavigate();
-  const { data, isLoading } = useAssignmentQuery(assignmentId);
+  const { user } = useAuth();
+  const { data, isLoading, refetch } = useAssignmentQuery(assignmentId);
   const { submit } = useAssessmentMutations();
-  const [answers, setAnswers] = useState<Record<string, AnswerState>>({});
+  const [error, setError] = useState<string | null>(null);
 
   const isSubmitted = data?.assignment.status === 'submitted';
-  const readOnly = isSubmitted;
 
   const answerMap = useMemo(() => {
     if (!isSubmitted || !data?.assignment.answers) return new Map();
     return new Map(data.assignment.answers.map((a) => [a.questionId, a]));
   }, [isSubmitted, data?.assignment.answers]);
 
-  const initAnswer = (q: AssessmentQuestion): AnswerState => {
-    const existing = answers[q.id || ''];
-    if (existing) return existing;
-    if (isSubmitted) {
-      const saved = answerMap.get(q.id || '');
-      return {
-        selectedOptionIds: (saved?.selectedOptionIds || []).map(String),
-        textAnswer: saved?.textAnswer || '',
-      };
-    }
-    return { selectedOptionIds: [], textAnswer: '' };
-  };
+  const studentName = useMemo(() => {
+    const parts = [user?.firstName, user?.lastName].filter(Boolean);
+    return parts.join(' ').trim() || user?.email || 'Student';
+  }, [user]);
 
-  const answeredCount = useMemo(() => {
-    if (!data?.assessment.questions.length || isSubmitted) return 0;
-    return data.assessment.questions.filter((q) => {
-      const a = answers[q.id || ''];
-      if (!a) return false;
-      if (q.type === 'short_answer') return a.textAnswer.trim().length > 0;
-      return a.selectedOptionIds.length > 0;
-    }).length;
-  }, [data, answers, isSubmitted]);
-
-  const allAnswered = useMemo(() => {
-    if (!data?.assessment.questions.length || isSubmitted) return false;
-    return answeredCount === data.assessment.questions.length;
-  }, [data, answeredCount, isSubmitted]);
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!assignmentId || !data || !allAnswered || readOnly) return;
-
-    for (const q of data.assessment.questions) {
-      if (q.type === 'short_answer') {
-        const text = (answers[q.id || '']?.textAnswer || '').trim();
-        const words = text.split(/\s+/).filter(Boolean);
-        if (words.length > 2) {
-          toast.error('Short answers must be 1–2 words');
-          return;
-        }
-      }
-    }
-
+  const handleCbtSubmit = async (
+    answers: { questionId: string; selectedOptionIds: string[]; textAnswer: string }[],
+    submitReason: 'manual' | 'timer' | 'fullscreen_exits'
+  ) => {
+    if (!assignmentId) return;
+    setError(null);
     try {
-      await submit.mutateAsync({
-        assignmentId,
-        answers: data.assessment.questions.map((q) => {
-          const a = answers[q.id || ''] ?? { selectedOptionIds: [], textAnswer: '' };
-          return {
-            questionId: q.id!,
-            selectedOptionIds: a.selectedOptionIds,
-            textAnswer: a.textAnswer,
-          };
-        }),
-      });
-      toast.success('Assessment submitted');
-      navigate('/my-assessments');
+      await submit.mutateAsync({ assignmentId, answers, submitReason });
+      try {
+        localStorage.removeItem(`assessment-answers-${assignmentId}`);
+      } catch {
+        /* ignore */
+      }
+      await refetch();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setError(msg || 'Failed to submit');
       toast.error(msg || 'Failed to submit');
+      await refetch();
+      throw err;
     }
   };
 
@@ -305,7 +73,7 @@ export function TakeAssessmentPage() {
     return (
       <Card className="mx-auto max-w-lg p-8 text-center text-sm text-slate-500">
         Assessment not found.{' '}
-        <Link to="/my-assessments" className="text-brand-600 hover:underline dark:text-brand-400">
+        <Link to={mine} className="text-brand-600 hover:underline dark:text-brand-400">
           Back to list
         </Link>
       </Card>
@@ -313,124 +81,563 @@ export function TakeAssessmentPage() {
   }
 
   const { assessment, assignment } = data;
-  const questionCount = assessment.questions.length;
-  const progressPct = questionCount ? Math.round((answeredCount / questionCount) * 100) : 0;
+  const resultsVisible = Boolean(assignment.resultsVisible);
+
+  // CBT live attempt
+  if (!isSubmitted) {
+    return (
+      <>
+        {error ? (
+          <div className="fixed left-0 right-0 top-0 z-[90] border-b border-red-200 bg-red-50 px-4 py-2 text-center text-sm text-red-700">
+            {error}
+          </div>
+        ) : null}
+        {online ? (
+          <CbtAttemptRunner
+            title={assessment.title}
+            studentName={studentName}
+            questions={assessment.questions}
+            sections={assessment.sections}
+            durationMinutes={assessment.durationMinutes ?? 60}
+            initialRemainingSeconds={
+              assignment.remainingSeconds === undefined ? null : assignment.remainingSeconds
+            }
+            storageKey={`assessment-answers-${assignment.id}`}
+            submitting={submit.isPending}
+            lockFullscreen
+            fullscreenExitCount={assignment.fullscreenExitCount || 0}
+            maxFullscreenExits={assignment.maxFullscreenExits || 3}
+            onFullscreenExit={
+              assignmentId ? () => recordFullscreenExit(assignmentId) : undefined
+            }
+            onSubmit={handleCbtSubmit}
+          />
+        ) : (
+          <AssessmentFormRunner
+            title={assessment.title}
+            description={assessment.description}
+            questions={assessment.questions}
+            initialRemainingSeconds={
+              assignment.remainingSeconds === undefined ? null : assignment.remainingSeconds
+            }
+            storageKey={`assessment-answers-${assignment.id}`}
+            submitting={submit.isPending}
+            onSubmit={(answers, reason) => handleCbtSubmit(answers, reason || 'manual')}
+          />
+        )}
+      </>
+    );
+  }
+
+  if (!resultsVisible) {
+    return (
+      <SubmissionHoldView
+        title={assessment.title}
+        description={assessment.description}
+        submittedAt={assignment.submittedAt}
+        online={online}
+        onBack={() => navigate(mine)}
+      />
+    );
+  }
+
+  const showAnswerKey = assessment.showAnswersAfterSubmit !== false;
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-6">
-      <div>
-        <button
-          type="button"
-          onClick={() => navigate('/my-assessments')}
-          className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition-colors hover:text-brand-700 dark:text-slate-400 dark:hover:text-brand-300"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-          My assessments
-        </button>
+    <StudentResultView
+      title={assessment.title}
+      description={assessment.description}
+      submittedAt={assignment.submittedAt}
+      startedAt={assignment.startedAt}
+      score={assignment.score}
+      maxScore={assignment.maxScore}
+      online={online}
+      showAnswerKey={showAnswerKey}
+      questions={assessment.questions}
+      answerMap={answerMap}
+      onBack={() => navigate(mine)}
+    />
+  );
+}
 
-        <Card className="relative overflow-hidden">
-          <div
-            className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand-500 to-cyan-400"
-            aria-hidden
+const CONFETTI_COLORS = ['#34d399', '#f472b6', '#60a5fa', '#fbbf24', '#a78bfa', '#fb7185', '#2dd4bf', '#fb923c'];
+
+function formatHoldDate(iso?: string | null) {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function ConfettiBurst() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const parent = canvas?.parentElement;
+    if (!canvas || !parent) return undefined;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return undefined;
+
+    const resize = () => {
+      canvas.width = parent.clientWidth;
+      canvas.height = parent.clientHeight;
+    };
+    resize();
+
+    const pieces = Array.from({ length: 110 }, () => ({
+      x: Math.random() * canvas.width,
+      y: -24 - Math.random() * canvas.height * 0.55,
+      color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+      vy: 1.4 + Math.random() * 2.6,
+      vx: -1.4 + Math.random() * 2.8,
+      rot: Math.random() * Math.PI,
+      vr: -0.12 + Math.random() * 0.24,
+      w: 5 + Math.random() * 6,
+      h: 7 + Math.random() * 8,
+    }));
+
+    let frame = 0;
+    let raf = 0;
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      let alive = false;
+      for (const piece of pieces) {
+        piece.x += piece.vx;
+        piece.y += piece.vy;
+        piece.vy += 0.025;
+        piece.rot += piece.vr;
+        if (piece.y < canvas.height + 30) alive = true;
+        ctx.save();
+        ctx.translate(piece.x, piece.y);
+        ctx.rotate(piece.rot);
+        ctx.fillStyle = piece.color;
+        ctx.globalAlpha = 0.92;
+        ctx.fillRect(-piece.w / 2, -piece.h / 2, piece.w, piece.h);
+        ctx.restore();
+      }
+      frame += 1;
+      if (alive && frame < 420) raf = requestAnimationFrame(draw);
+    };
+    raf = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  return <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden />;
+}
+
+function SubmissionHoldView({
+  title,
+  description,
+  submittedAt,
+  online,
+  onBack,
+}: {
+  title: string;
+  description?: string;
+  submittedAt?: string | null;
+  online: boolean;
+  onBack: () => void;
+}) {
+  const dots = useMemo(
+    () =>
+      Array.from({ length: 36 }, (_, i) => ({
+        id: i,
+        left: `${(i * 17) % 100}%`,
+        top: `${(i * 29) % 100}%`,
+        size: 6 + (i % 5) * 3,
+        color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+      })),
+    []
+  );
+  const when = formatHoldDate(submittedAt);
+  const blurb = (description || '').trim();
+  const meta = [blurb.length > 48 ? `${blurb.slice(0, 48).trim()}…` : blurb, when].filter(Boolean).join(' · ');
+  const examLabel = online ? 'online assessment' : 'assessment';
+
+  return (
+    <div className="absolute inset-0 z-10 overflow-y-auto bg-[linear-gradient(115deg,#e8f7f0_0%,#f4f8f5_46%,#f8f0e6_100%)] dark:bg-[linear-gradient(115deg,#10211c_0%,#121820_52%,#211c16_100%)]">
+      <div className="relative flex min-h-full flex-col px-4 py-6 md:px-8 md:py-8">
+      <ConfettiBurst />
+      <div className="pointer-events-none absolute inset-0" aria-hidden>
+        {dots.map((dot) => (
+          <span
+            key={dot.id}
+            className="absolute rounded-full opacity-70"
+            style={{
+              left: dot.left,
+              top: dot.top,
+              width: dot.size,
+              height: dot.size,
+              backgroundColor: dot.color,
+            }}
           />
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="mb-2 flex flex-wrap items-center gap-2">
-                <Badge tone={isSubmitted ? 'success' : 'warning'}>
-                  {isSubmitted ? 'Submitted' : 'In progress'}
-                </Badge>
-                <span className="text-xs text-slate-500">
-                  {questionCount} question{questionCount !== 1 ? 's' : ''}
-                </span>
-              </div>
-              <h1 className="font-display text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                {assessment.title}
-              </h1>
-              {assessment.description ? (
-                <p className="mt-1.5 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
-                  {assessment.description}
-                </p>
-              ) : null}
-              {assignment.dueDate ? (
-                <p className="mt-2 text-xs text-slate-500">
-                  Due {new Date(assignment.dueDate).toLocaleString()}
-                </p>
-              ) : null}
-            </div>
-
-            {isSubmitted ? (
-              <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-center dark:bg-emerald-500/10">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
-                  Your score
-                </p>
-                <p className="mt-0.5 font-display text-2xl font-bold tabular-nums text-emerald-800 dark:text-emerald-200">
-                  {assignment.score}
-                  <span className="text-base font-semibold text-emerald-600/80 dark:text-emerald-400/80">
-                    /{assignment.maxScore}
-                  </span>
-                </p>
-              </div>
-            ) : null}
-          </div>
-
-          {!isSubmitted && questionCount > 0 ? (
-            <div className="mt-5 space-y-2">
-              <div className="flex items-center justify-between text-xs text-slate-500">
-                <span>
-                  Answered {answeredCount} of {questionCount}
-                </span>
-                <span className="tabular-nums">{progressPct}%</span>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-brand-500 to-cyan-400 transition-all duration-300"
-                  style={{ width: `${progressPct}%` }}
-                />
-              </div>
-            </div>
-          ) : null}
-        </Card>
+        ))}
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {assessment.questions.map((q, i) => {
-          const qid = q.id || '';
-          const saved = answerMap.get(qid);
-          return (
-            <QuestionBlock
-              key={qid}
-              question={q}
-              index={i}
-              answer={initAnswer(q)}
-              readOnly={readOnly}
-              showResult={
-                isSubmitted
-                  ? { isCorrect: saved?.isCorrect, pointsEarned: saved?.pointsEarned }
-                  : undefined
-              }
-              onChange={(a) => setAnswers((prev) => ({ ...prev, [qid]: a }))}
-            />
-          );
-        })}
+      <div className="relative z-10 mx-auto flex w-full max-w-5xl shrink-0 flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-800/80 dark:text-emerald-200/80">
+            {online ? 'Online assessment result' : 'Assessment result'}
+          </p>
+          <h1 className="mt-2 font-display text-4xl font-bold uppercase tracking-tight text-slate-900 dark:text-white">
+            {title}
+          </h1>
+          {meta ? <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{meta}</p> : null}
+        </div>
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+        >
+          <span aria-hidden>←</span>
+          {online ? 'All online assessments' : 'All assessments'}
+        </button>
+      </div>
 
-        {!readOnly && (
-          <Card className="sticky bottom-4 z-10 flex flex-wrap items-center justify-end gap-2 border-brand-200/60 bg-white/95 shadow-glow backdrop-blur dark:border-brand-800/40 dark:bg-slate-900/95">
-            <span className="mr-auto text-xs text-slate-500">
-              {allAnswered
-                ? 'Ready to submit'
-                : `${questionCount - answeredCount} question${questionCount - answeredCount !== 1 ? 's' : ''} left`}
-            </span>
-            <Button type="button" variant="secondary" onClick={() => navigate('/my-assessments')}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={!allAnswered || submit.isPending}>
-              {submit.isPending ? 'Submitting…' : 'Submit assessment'}
-            </Button>
-          </Card>
+      <div className="relative z-10 mx-auto my-auto w-full max-w-md shrink-0 rounded-3xl bg-white px-8 py-10 text-center shadow-[0_20px_60px_-24px_rgba(15,23,42,0.35)] dark:bg-slate-900">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2" />
+            <circle cx="12" cy="12" r="8" />
+          </svg>
+        </div>
+        <h2 className="mt-5 font-display text-xl font-bold text-emerald-900 dark:text-emerald-100">
+          Thank you for attempting!
+        </h2>
+        <p className="mt-3 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+          Your {examLabel} was submitted{when ? ` on ${when}` : ''}. Great work completing it.
+        </p>
+        <p className="mt-6 text-sm font-bold text-slate-900 dark:text-white">Results on hold</p>
+        <p className="mt-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+          The academy will release results soon. You will get an email when they are available — then open them here on the site.
+        </p>
+        <p className="mt-5 text-xs text-slate-400">Scores are not shared by email.</p>
+      </div>
+      </div>
+    </div>
+  );
+}
+
+function resultMood(percentage: number) {
+  if (percentage >= 80) {
+    return {
+      emoji: '😄',
+      title: 'Excellent',
+      message: 'You have a strong grip on this topic.',
+    };
+  }
+  if (percentage >= 50) {
+    return {
+      emoji: '🙂',
+      title: 'Good effort',
+      message: 'You are close. Review the questions you missed.',
+    };
+  }
+  return {
+    emoji: '😔',
+    title: 'Needs work',
+    message: 'This topic needs another round. Ask your teacher for help.',
+  };
+}
+
+function formatTaken(seconds: number | null) {
+  if (seconds == null) return '—';
+  const s = Math.max(0, Math.floor(seconds));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  if (m <= 0) return `${r}s`;
+  return `${m}m ${r}s`;
+}
+
+function formatScore(n: number | null | undefined) {
+  const value = Number(n) || 0;
+  if (Number.isInteger(value)) return String(value);
+  return value.toFixed(2).replace(/\.?0+$/, '');
+}
+
+function downloadResultImage(
+  title: string,
+  mood: { emoji: string; title: string; message: string },
+  scoreLabel: string,
+  percentage: number,
+  stats: { label: string; value: string; color: string }[]
+) {
+  const canvas = document.createElement('canvas');
+  const width = 960;
+  const height = 560;
+  canvas.width = width * 2;
+  canvas.height = height * 2;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.scale(2, 2);
+  ctx.fillStyle = '#f4f8f5';
+  ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.roundRect(40, 36, width - 80, height - 72, 28);
+  ctx.fill();
+  ctx.font = '64px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(mood.emoji, width / 2, 130);
+  ctx.fillStyle = '#0f172a';
+  ctx.font = 'bold 36px sans-serif';
+  ctx.fillText(mood.title, width / 2, 190);
+  ctx.fillStyle = '#64748b';
+  ctx.font = '18px sans-serif';
+  ctx.fillText(mood.message, width / 2, 226);
+  ctx.fillStyle = '#0f172a';
+  ctx.font = 'bold 54px sans-serif';
+  ctx.fillText(scoreLabel, width / 2, 300);
+  ctx.fillStyle = '#047857';
+  ctx.font = '18px sans-serif';
+  ctx.fillText(`${percentage}% score`, width / 2, 334);
+  stats.forEach((stat, index) => {
+    const x = 80 + index * 200;
+    ctx.fillStyle = '#f8fafc';
+    ctx.beginPath();
+    ctx.roundRect(x, 380, 180, 100, 16);
+    ctx.fill();
+    ctx.fillStyle = stat.color;
+    ctx.font = 'bold 28px sans-serif';
+    ctx.fillText(stat.value, x + 90, 424);
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '13px sans-serif';
+    ctx.fillText(stat.label, x + 90, 454);
+  });
+  const link = document.createElement('a');
+  link.href = canvas.toDataURL('image/png');
+  link.download = `${title.replace(/[^\w.-]+/g, '-') || 'result'}-result.png`;
+  link.click();
+}
+
+function StudentResultView({
+  title,
+  description,
+  submittedAt,
+  startedAt,
+  score,
+  maxScore,
+  online,
+  showAnswerKey,
+  questions,
+  answerMap,
+  onBack,
+}: {
+  title: string;
+  description?: string;
+  submittedAt?: string | null;
+  startedAt?: string | null;
+  score: number | null;
+  maxScore: number;
+  online: boolean;
+  showAnswerKey: boolean;
+  questions: AssessmentQuestion[];
+  answerMap: Map<string, { selectedOptionIds?: string[]; textAnswer?: string; isCorrect?: boolean; pointsEarned?: number }>;
+  onBack: () => void;
+}) {
+  const summary = useMemo(() => {
+    let correct = 0;
+    let wrong = 0;
+    let skipped = 0;
+    for (const question of questions) {
+      const saved = answerMap.get(question.id || '');
+      const hasResponse = Boolean(
+        saved &&
+          ((saved.selectedOptionIds || []).length > 0 || String(saved.textAnswer || '').trim())
+      );
+      if (!hasResponse) skipped += 1;
+      else if (saved?.isCorrect) correct += 1;
+      else wrong += 1;
+    }
+    const earned = Number(score) || 0;
+    const total = Number(maxScore) || 0;
+    const percentage = total > 0 ? Math.round((earned / total) * 100) : 0;
+    const timeTaken =
+      startedAt && submittedAt
+        ? Math.max(0, Math.floor((new Date(submittedAt).getTime() - new Date(startedAt).getTime()) / 1000))
+        : null;
+    return { correct, wrong, skipped, earned, total, percentage, timeTaken };
+  }, [questions, answerMap, score, maxScore, startedAt, submittedAt]);
+
+  const mood = resultMood(summary.percentage);
+  const when = formatHoldDate(submittedAt);
+  const blurb = (description || '').trim();
+  const meta = [blurb.length > 48 ? `${blurb.slice(0, 48).trim()}…` : blurb, when].filter(Boolean).join(' · ');
+  const scoreLabel = `${formatScore(summary.earned)}/${formatScore(summary.total)}`;
+  const stats = [
+    { label: 'Correct', value: String(summary.correct), color: '#059669' },
+    { label: 'Wrong', value: String(summary.wrong), color: '#e11d48' },
+    { label: 'Skipped', value: String(summary.skipped), color: '#64748b' },
+    { label: 'Time taken', value: formatTaken(summary.timeTaken), color: '#0f172a' },
+  ];
+
+  return (
+    <div className="absolute inset-0 z-10 overflow-y-auto bg-[linear-gradient(115deg,#e8f7f0_0%,#f4f8f5_46%,#f8f0e6_100%)] dark:bg-[linear-gradient(115deg,#10211c_0%,#121820_52%,#211c16_100%)]">
+      <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col px-4 py-8 md:px-8">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-800/80 dark:text-emerald-200/80">
+              {online ? 'Online assessment result' : 'Assessment result'}
+            </p>
+            <h1 className="mt-2 font-display text-4xl font-bold uppercase tracking-tight text-slate-900 dark:text-white">
+              {title}
+            </h1>
+            {meta ? <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{meta}</p> : null}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => downloadResultImage(title, mood, scoreLabel, summary.percentage, stats)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8.5V6a2 2 0 012-2h2.5M16.5 4H19a2 2 0 012 2v2.5M21 15.5V18a2 2 0 01-2 2h-2.5M7.5 20H5a2 2 0 01-2-2v-2.5" />
+                <circle cx="12" cy="12" r="3.25" />
+              </svg>
+              Screenshot result
+            </button>
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              <span aria-hidden>←</span>
+              {online ? 'All online assessments' : 'All assessments'}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-8 rounded-[28px] bg-white px-6 py-10 text-center shadow-[0_20px_60px_-28px_rgba(15,23,42,0.35)] dark:bg-slate-900 sm:px-10">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white text-4xl shadow-md ring-1 ring-slate-100 dark:bg-slate-800 dark:ring-slate-700">
+            <span aria-hidden>{mood.emoji}</span>
+          </div>
+          <h2 className="mt-5 font-display text-2xl font-bold text-slate-900 dark:text-white">{mood.title}</h2>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{mood.message}</p>
+          <p className="mt-6 font-display text-5xl font-bold tracking-tight text-slate-900 dark:text-white">
+            {formatScore(summary.earned)}
+            <span className="text-3xl font-semibold text-slate-400">/{formatScore(summary.total)}</span>
+          </p>
+          <p className="mt-1 text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+            {summary.percentage}% score
+          </p>
+          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {stats.map((stat) => (
+              <div key={stat.label} className="rounded-2xl border border-slate-100 bg-slate-50/80 px-3 py-4 dark:border-slate-800 dark:bg-slate-950/40">
+                <p className="text-2xl font-bold tabular-nums" style={{ color: stat.color }}>
+                  {stat.value}
+                </p>
+                <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {showAnswerKey ? (
+          <div className="mt-8 space-y-4 pb-8">
+            {questions.map((question, index) => {
+              const qid = question.id || '';
+              const saved = answerMap.get(qid);
+              return (
+                <ReviewQuestion
+                  key={qid || index}
+                  question={question}
+                  index={index}
+                  selectedOptionIds={(saved?.selectedOptionIds || []).map(String)}
+                  textAnswer={saved?.textAnswer || ''}
+                  isCorrect={saved?.isCorrect}
+                  pointsEarned={saved?.pointsEarned}
+                />
+              );
+            })}
+          </div>
+        ) : (
+          <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-white/70 px-6 py-4 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400">
+            Your teacher has not released the answer key for this test.
+          </div>
         )}
-      </form>
+      </div>
+    </div>
+  );
+}
+
+function ReviewQuestion({
+  question,
+  index,
+  selectedOptionIds,
+  textAnswer,
+  isCorrect,
+  pointsEarned,
+}: {
+  question: AssessmentQuestion;
+  index: number;
+  selectedOptionIds: string[];
+  textAnswer: string;
+  isCorrect?: boolean;
+  pointsEarned?: number;
+}) {
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
+      <div
+        className={clsx(
+          'absolute inset-y-0 left-0 w-1',
+          isCorrect ? 'bg-emerald-500' : 'bg-rose-500'
+        )}
+        aria-hidden
+      />
+      <div className="space-y-3 p-4 pl-5 sm:p-5 sm:pl-6">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-2.5">
+            <span className="inline-flex h-7 min-w-7 shrink-0 items-center justify-center rounded-lg bg-slate-900 px-2 text-xs font-bold text-white dark:bg-white dark:text-slate-900">
+              {index + 1}
+            </span>
+            <p className="pt-0.5 text-sm font-semibold leading-snug text-slate-900 dark:text-white">
+              {question.prompt}
+            </p>
+          </div>
+          <Badge tone="neutral">
+            {question.points} pt{question.points !== 1 ? 's' : ''}
+          </Badge>
+        </div>
+        <Badge tone={isCorrect ? 'success' : 'danger'}>
+          {isCorrect ? `Correct (+${pointsEarned ?? 0})` : 'Incorrect'}
+        </Badge>
+
+        {question.type === 'short_answer' ? (
+          <div className="text-sm text-slate-700 dark:text-slate-200">
+            Your answer: <span className="font-medium">{textAnswer || '—'}</span>
+            {question.acceptedAnswers?.length ? (
+              <p className="mt-1 text-xs text-slate-500">
+                Accepted: {question.acceptedAnswers.join(', ')}
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <ul className="space-y-1.5 text-sm">
+            {question.options.map((opt) => {
+              const selected = selectedOptionIds.includes(opt.id || '');
+              return (
+                <li
+                  key={opt.id}
+                  className={clsx(
+                    'rounded-lg border px-3 py-2',
+                    selected
+                      ? 'border-brand-400 bg-brand-50/70 dark:border-brand-500/40 dark:bg-brand-500/10'
+                      : 'border-slate-200 dark:border-slate-700',
+                    opt.isCorrect && 'ring-1 ring-emerald-400'
+                  )}
+                >
+                  {opt.text}
+                  {opt.isCorrect ? (
+                    <span className="ml-2 text-xs font-medium text-emerald-600">(correct)</span>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

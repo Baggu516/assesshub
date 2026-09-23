@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Badge, Button, Card, CardStat, FormField, Input } from '@/components/ui';
+import { Badge, Button, Card, CardStat, FormField, Input, PasswordInput } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
 import { useUserMutations } from '@/hooks/api/useUsers';
 
@@ -52,9 +52,12 @@ export function ProfilePage() {
         <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">Profile</h1>
         <p className="text-sm text-slate-500 mt-1">Your identity in this workspace. Changes apply after you save.</p>
       </div>
-      <div className="grid sm:grid-cols-2 gap-4">
+      <div className="grid sm:grid-cols-2 gap-4 lg:grid-cols-3">
         <CardStat label="Hierarchy" value={user.hierarchyRole} />
         <CardStat label="Permission count" value={user.permissions.length} />
+        {user.registrationId ? (
+          <CardStat label="Registration ID" value={user.registrationId} />
+        ) : null}
       </div>
 
       <Card>
@@ -91,9 +94,8 @@ export function ProfilePage() {
             htmlFor="profile-password"
             hint="Minimum 8 characters when changing password."
           >
-            <Input
+            <PasswordInput
               id="profile-password"
-              type="password"
               placeholder="Leave blank to keep current password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}

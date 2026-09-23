@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
-import { platformApi } from '@/lib/platformApi';
+import { api } from '@/lib/api';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -183,7 +183,7 @@ function EditOrganizationModal({
   const { data: detail, isLoading: pocLoading } = useQuery({
     queryKey: ['platform-organization', org?.id],
     queryFn: async () => {
-      const { data: res } = await platformApi.get<{ organization: PlatformOrg }>(
+      const { data: res } = await api.get<{ organization: PlatformOrg }>(
         `/platform/organizations/${org!.id}`
       );
       return res.organization;
@@ -398,7 +398,7 @@ function CreateOrganizationModal({
       }
       if (logoFile) fd.append('logo', logoFile);
 
-      const { data } = await platformApi.post<CreateOrgResponse>('/platform/organizations', fd);
+      const { data } = await api.post<CreateOrgResponse>('/platform/organizations', fd);
       return data;
     },
     onSuccess: (data) => {
@@ -608,7 +608,7 @@ function CreateOrganizationModal({
   );
 }
 
-export function PlatformOrganizationsPage() {
+export function ClientsPage() {
   const qc = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [editingOrg, setEditingOrg] = useState<PlatformOrg | null>(null);
@@ -618,7 +618,7 @@ export function PlatformOrganizationsPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['platform-organizations'],
     queryFn: async () => {
-      const { data: res } = await platformApi.get<{ organizations: PlatformOrg[] }>(
+      const { data: res } = await api.get<{ organizations: PlatformOrg[] }>(
         '/platform/organizations'
       );
       return res.organizations;
@@ -627,7 +627,7 @@ export function PlatformOrganizationsPage() {
 
   const patchMutation = useMutation({
     mutationFn: async ({ id, form }: { id: string; form: FormData }) => {
-      const { data: res } = await platformApi.patch<{ organization: PlatformOrg }>(
+      const { data: res } = await api.patch<{ organization: PlatformOrg }>(
         `/platform/organizations/${id}`,
         form
       );
@@ -675,8 +675,8 @@ export function PlatformOrganizationsPage() {
     return (
       <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
         {code === 503
-          ? 'Platform API is disabled on the server (set PLATFORM_ADMIN_API_KEY).'
-          : msg || 'Could not load organizations.'}
+          ? 'Client management is unavailable on the server.'
+          : msg || 'Could not load clients.'}
       </div>
     );
   }

@@ -50,15 +50,15 @@ function BrandMark({ compact }: { compact?: boolean }) {
         className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-cyan-600 text-white shadow-glow"
         aria-hidden
       >
-        <span className="font-display text-sm font-bold tracking-tight">AH</span>
+        <span className="font-display text-sm font-bold tracking-tight">CT</span>
         <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-white dark:ring-slate-950" />
       </div>
       {!compact && (
         <div className="min-w-0">
           <p className="truncate font-display text-sm font-bold leading-snug tracking-tight text-slate-900 dark:text-white">
-            AssessHub
+            ClassTrio
           </p>
-          <p className="text-[11px] font-medium leading-normal text-slate-500">Platform console</p>
+          <p className="text-[11px] font-medium leading-normal text-slate-500">Master console</p>
         </div>
       )}
     </div>
@@ -66,9 +66,9 @@ function BrandMark({ compact }: { compact?: boolean }) {
 }
 
 function pageMeta(pathname: string) {
-  if (pathname.includes('/orgs')) return { title: 'Organizations', crumb: 'Registry · Tenants' };
-  if (pathname.includes('/users')) return { title: 'Users', crumb: 'Registry · Operators' };
-  return { title: 'Dashboard', crumb: 'Registry · Overview' };
+  if (pathname.includes('/orgs')) return { title: 'Clients', crumb: 'Master · Clients' };
+  if (pathname.includes('/users')) return { title: 'Operators', crumb: 'Master · Operators' };
+  return { title: 'Dashboard', crumb: 'Master · Overview' };
 }
 
 export function PlatformLayout() {
@@ -87,15 +87,15 @@ export function PlatformLayout() {
   const items = useMemo(
     () => [
       { to: '/platform', label: 'Dashboard', end: true },
-      { to: '/platform/orgs', label: 'Organizations', end: false },
-      { to: '/platform/users', label: 'Users', end: false },
+      { to: '/platform/orgs', label: 'Clients', end: false },
+      { to: '/platform/users', label: 'Operators', end: false },
     ],
     []
   );
 
   const exit = () => {
     clearPlatformSession();
-    navigate('/platform/login', { replace: true });
+    navigate('/login', { replace: true });
   };
 
   const cycleTheme = () => {

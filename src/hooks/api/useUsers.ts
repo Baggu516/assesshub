@@ -4,6 +4,7 @@ import { api } from '@/lib/api';
 export interface UserListRow {
   id: string;
   email: string;
+  registrationId?: string | null;
   hierarchyRole: string;
   isActive: boolean;
   firstName?: string;
@@ -69,7 +70,7 @@ export function useUserMutations() {
   const qc = useQueryClient();
   const createSubordinate = useMutation({
     mutationFn: async (body: Record<string, unknown>) => {
-      const { data } = await api.post('/users/subordinates', body);
+      const { data } = await api.post<{ user: UserListRow }>('/users/subordinates', body);
       return data;
     },
     onSuccess: () => {
@@ -79,7 +80,10 @@ export function useUserMutations() {
     },
   });
   const createMember = useMutation({
-    mutationFn: async (body: Record<string, unknown>) => (await api.post('/users/members', body)).data,
+    mutationFn: async (body: Record<string, unknown>) =>
+      (
+        await api.post<{ user: UserListRow; generatedPassword?: string }>('/users/members', body)
+      ).data,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['users'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });

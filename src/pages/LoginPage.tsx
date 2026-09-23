@@ -1,23 +1,180 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
 import { useTenant } from '@/context/TenantContext';
-import { Button, Input } from '@/components/ui';
+import { Button, Input, PasswordInput } from '@/components/ui';
+import { isMasterHost, isReservedSubdomain } from '@/lib/masterHost';
+
+type TenantBranding = {
+  name: string;
+  subdomain: string;
+  logoUrl: string | null;
+  tagline: string | null;
+  isActive: boolean;
+};
+
+/** Same story on every school URL and the master console. */
+const LOGIN_HIGHLIGHTS = [
+  { title: 'AI', label: 'Dashboard chat' },
+  { title: 'PDF', label: 'Worksheets' },
+  { title: 'CBT', label: 'Online exams' },
+];
+
+const REMEMBER_KEY = 'ah_login_remember_email';
+
+function BrandMark({
+  name,
+  logoUrl,
+  compact,
+}: {
+  name: string;
+  logoUrl?: string | null;
+  compact?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-2.5">
+      {logoUrl ? (
+        <img
+          src={logoUrl}
+          alt=""
+          className={compact ? 'h-8 w-8 object-contain' : 'h-9 w-9 object-contain'}
+        />
+      ) : (
+        <span
+          className={`grid shrink-0 place-items-center rounded-lg bg-brand-600 font-display font-bold text-white ${
+            compact ? 'h-8 w-8 text-[10px]' : 'h-9 w-9 text-xs'
+          }`}
+          aria-hidden
+        >
+          {name
+            .split(/\s+/)
+            .filter(Boolean)
+            .slice(0, 2)
+            .map((w) => w[0])
+            .join('')
+            .toUpperCase() || 'CT'}
+        </span>
+      )}
+      <span className={`font-display font-semibold tracking-tight text-slate-900 ${compact ? 'text-base' : 'text-lg'}`}>
+        {name}
+      </span>
+    </div>
+  );
+}
+
+function MailIcon() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} aria-hidden>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"
+      />
+    </svg>
+  );
+}
+
+function LockIcon() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} aria-hidden>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
+      />
+    </svg>
+  );
+}
 
 export function LoginPage() {
   const { login } = useAuth();
   const { subdomain, setSubdomain } = useTenant();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => localStorage.getItem(REMEMBER_KEY) || '');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [remember, setRemember] = useState(() => !!localStorage.getItem(REMEMBER_KEY));
   const [loading, setLoading] = useState(false);
+  const [branding, setBranding] = useState<TenantBranding | null>(null);
+  const [brandingError, setBrandingError] = useState<string | null>(null);
+
+  const masterHost = useMemo(() => isMasterHost(), []);
+  const hostLockedSubdomain = useMemo(() => {
+    const host = window.location.hostname.toLowerCase();
+    const base = (import.meta.env.VITE_BASE_DOMAIN || 'classtrio.in').toLowerCase();
+    if (host.endsWith(`.${base}`) && host !== base && !host.startsWith('master.')) {
+      return host.replace(`.${base}`, '').split('.')[0] || null;
+    }
+    if (host.endsWith('.localhost') && !host.startsWith('master.')) {
+      const sub = host.replace('.localhost', '').split('.')[0] || null;
+      return sub === 'master' ? null : sub;
+    }
+    return null;
+  }, []);
+
+  /** Localhost / master.* → reserved master tenant (full app + Clients). */
+  const isMasterLogin = masterHost && !hostLockedSubdomain;
+
+  useEffect(() => {
+    if (hostLockedSubdomain) {
+      setSubdomain(hostLockedSubdomain);
+      return;
+    }
+    if (isMasterLogin) setSubdomain('master');
+  }, [hostLockedSubdomain, isMasterLogin, setSubdomain]);
+
+  useEffect(() => {
+    const sub = hostLockedSubdomain;
+    if (isMasterLogin || !sub || isReservedSubdomain(sub)) {
+      setBranding(null);
+      setBrandingError(null);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setBrandingError(null);
+      try {
+        const res = await fetch(`/api/public/tenants/${encodeURIComponent(sub)}`);
+        if (!res.ok) {
+          if (!cancelled) {
+            setBranding(null);
+            setBrandingError(res.status === 404 ? 'School not found' : 'Could not load school');
+          }
+          return;
+        }
+        const data = (await res.json()) as { tenant: TenantBranding };
+        if (!cancelled) setBranding(data.tenant);
+      } catch {
+        if (!cancelled) {
+          setBranding(null);
+          setBrandingError('Could not load school');
+        }
+      }
+    }, 200);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [hostLockedSubdomain, isMasterLogin]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await login(email, password);
+      if (remember) localStorage.setItem(REMEMBER_KEY, email.trim());
+      else localStorage.removeItem(REMEMBER_KEY);
+
+      if (isMasterLogin) {
+        await login(email, password, 'master');
+        return;
+      }
+
+      const sub = hostLockedSubdomain || subdomain;
+      if (!sub || isReservedSubdomain(sub)) {
+        toast.error('Open your school URL to sign in (e.g. school.classtrio.in)');
+        return;
+      }
+      await login(email, password, sub);
     } catch (err: unknown) {
       const msg =
         err && typeof err === 'object' && 'response' in err
@@ -29,137 +186,171 @@ export function LoginPage() {
     }
   };
 
+  const productName = isMasterLogin ? 'ClassTrio' : branding?.name || 'ClassTrio';
+
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-2">
-      {/* Brand panel — quiet atmosphere, brand as the hero */}
-      <aside className="relative flex min-h-[42vh] flex-col justify-end overflow-hidden bg-brand-800 px-8 pb-12 pt-10 sm:px-12 lg:min-h-screen lg:justify-between lg:px-16 lg:pb-16 lg:pt-14">
+      {/* Brand panel — Enculture-style soft left */}
+      <aside className="relative hidden min-h-screen flex-col overflow-hidden bg-[#E8F7F4] px-10 py-10 lg:flex xl:px-14 xl:py-12">
         <div
           className="pointer-events-none absolute inset-0"
           style={{
             background:
-              'radial-gradient(ellipse 90% 70% at 0% 100%, rgb(45 212 191 / 0.28), transparent 55%), radial-gradient(ellipse 60% 50% at 100% 0%, rgb(15 118 110 / 0.55), transparent 50%), linear-gradient(165deg, #0f766e 0%, #134e4a 55%, #0b3d3a 100%)',
+              'radial-gradient(ellipse 80% 60% at 10% 0%, rgb(45 212 191 / 0.35), transparent 55%), radial-gradient(ellipse 70% 50% at 100% 100%, rgb(20 184 166 / 0.22), transparent 50%), linear-gradient(160deg, #F3FBFA 0%, #DDF4EF 48%, #C8EDE6 100%)',
           }}
           aria-hidden
         />
-        {/* Soft drifting light */}
         <div
-          className="pointer-events-none absolute -left-1/4 top-1/3 h-[28rem] w-[28rem] rounded-full bg-teal-300/20 blur-3xl motion-safe:animate-[fade-in_1.6s_ease-out_both]"
+          className="pointer-events-none absolute -right-24 top-1/3 h-80 w-80 rounded-full bg-brand-300/30 blur-3xl motion-safe:animate-drift"
           aria-hidden
         />
         <div
-          className="pointer-events-none absolute -right-1/4 bottom-0 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl motion-safe:animate-[fade-in_2s_ease-out_0.2s_both]"
+          className="pointer-events-none absolute -left-16 bottom-0 h-64 w-64 rounded-full bg-cyan-200/40 blur-3xl motion-safe:animate-drift-slow"
           aria-hidden
         />
 
-        <div className="relative z-10 animate-fade-up">
-          <p className="font-display text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl">
-            AssessHub
-          </p>
-          <p className="mt-5 max-w-[14rem] text-lg leading-snug text-white/90 sm:max-w-none sm:text-xl">
-            Assessment for schools
-          </p>
-          <p className="mt-3 max-w-[16rem] text-sm leading-relaxed text-teal-100/55">
-            AI that helps teachers teach and students learn
-          </p>
+        <div className="relative z-10 flex min-h-0 flex-1 flex-col">
+          <div className="motion-safe:animate-rise-in">
+            <BrandMark name={productName} logoUrl={branding?.logoUrl} />
+          </div>
+
+          <div className="my-auto max-w-xl py-16 motion-safe:animate-rise-in motion-safe:[animation-delay:80ms]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-800/70">
+              School platform
+            </p>
+            <h1 className="mt-5 font-serif text-[2.75rem] font-semibold leading-[1.12] tracking-tight text-slate-900 xl:text-[3.35rem]">
+              <span className="bg-gradient-to-br from-brand-800 via-brand-700 to-teal-600 bg-clip-text text-transparent">
+                Assessment for schools
+              </span>
+            </h1>
+            <p className="mt-5 max-w-md text-[15px] leading-relaxed text-slate-600">
+              Worksheets, assessments, and online exams in one place, with AI chat when a school turns it on.
+            </p>
+
+            {branding?.logoUrl ? (
+              <div className="mt-10 flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-white/70 p-2 ring-1 ring-brand-200/80">
+                <img src={branding.logoUrl} alt="" className="max-h-full max-w-full object-contain" />
+              </div>
+            ) : null}
+          </div>
+
+          <div className="relative z-10 space-y-6 motion-safe:animate-rise-in motion-safe:[animation-delay:160ms]">
+            <div className="grid grid-cols-3 gap-3">
+              {LOGIN_HIGHLIGHTS.map((f) => (
+                <div
+                  key={f.label}
+                  className="rounded-2xl bg-white/80 px-3.5 py-3.5 ring-1 ring-white/90 backdrop-blur-sm"
+                >
+                  <p className="font-serif text-xl font-semibold text-brand-800">{f.title}</p>
+                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    {f.label}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-slate-500/80">ClassTrio © {new Date().getFullYear()}. All rights reserved.</p>
+          </div>
         </div>
-
-        <p className="relative z-10 mt-10 hidden text-sm text-teal-100/45 animate-[fade-in_0.8s_ease-out_0.35s_both] lg:mt-0 lg:block">
-          Teachers · Students · Admins
-        </p>
       </aside>
 
-      {/* Sign-in */}
-      <main className="relative flex flex-col justify-center overflow-hidden bg-[rgb(var(--surface))] px-6 py-16 sm:px-12 lg:px-20 xl:px-28">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-70 dark:opacity-100"
-          style={{
-            background:
-              'radial-gradient(ellipse 70% 50% at 80% 20%, rgb(20 184 166 / 0.07), transparent 55%), radial-gradient(ellipse 50% 40% at 10% 90%, rgb(14 165 233 / 0.05), transparent 50%)',
-          }}
-          aria-hidden
-        />
+      {/* Form panel */}
+      <main className="relative flex min-h-screen flex-col bg-white px-6 py-10 dark:bg-[rgb(var(--surface))] sm:px-12 lg:px-16 xl:px-24">
+        <div className="mx-auto flex w-full max-w-[24rem] flex-1 flex-col justify-center motion-safe:animate-rise-in">
+          <div className="mb-10 flex justify-center lg:mb-12">
+            <BrandMark name={productName} logoUrl={branding?.logoUrl} compact />
+          </div>
 
-        <div className="relative z-10 mx-auto w-full max-w-[20rem] animate-fade-up">
-          <div className="mb-12 lg:hidden">
-            <p className="font-display text-xl font-bold tracking-tight text-brand-800 dark:text-brand-300">
-              AssessHub
+          <div className="text-center">
+            <h2 className="font-serif text-3xl font-semibold tracking-tight text-slate-900 dark:text-white sm:text-[2rem]">
+              Welcome back
+            </h2>
+            <p className="mt-2 text-sm text-slate-500">
+              {isMasterLogin
+                ? 'Sign in to the master console'
+                : branding
+                  ? `Sign in to ${branding.name}`
+                  : 'Sign in to ClassTrio'}
             </p>
           </div>
 
-          <h1 className="font-display text-[1.65rem] font-bold tracking-tight text-slate-900 dark:text-white">
-            Sign in
-          </h1>
+          {brandingError && !isMasterLogin ? (
+            <p className="mt-6 text-center text-xs text-rose-600 dark:text-rose-400">{brandingError}</p>
+          ) : null}
 
-          <form onSubmit={onSubmit} className="mt-10 space-y-6">
+          <form onSubmit={onSubmit} className="mt-9 space-y-5">
             <div className="space-y-2">
-              <label htmlFor="subdomain" className="block text-[13px] text-slate-500 dark:text-slate-400">
-                School
+              <label
+                htmlFor="email"
+                className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"
+              >
+                {isMasterLogin ? 'Email' : 'Email or registration ID'}
               </label>
-              <div className="flex overflow-hidden rounded-xl border border-slate-200 bg-white transition-colors focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/25 dark:border-slate-600 dark:bg-slate-950">
-                <Input
-                  id="subdomain"
-                  value={subdomain}
-                  onChange={(e) => setSubdomain(e.target.value)}
-                  placeholder="your-school"
-                  required
-                  className="rounded-none border-0 focus:ring-0"
-                />
-                <span className="flex shrink-0 items-center border-l border-slate-100 bg-slate-50/80 px-3 text-xs text-slate-400 dark:border-slate-700 dark:bg-slate-900/80">
-                  .assesshub.com
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                  <MailIcon />
                 </span>
+                <Input
+                  id="email"
+                  type={isMasterLogin ? 'email' : 'text'}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder={isMasterLogin ? 'you@classtrio.in' : 'you@school.edu or VISWAM48291'}
+                  required
+                  autoComplete="username"
+                  className="rounded-xl border-brand-200/80 py-3 pl-11 shadow-none focus:border-brand-500 dark:border-slate-600"
+                />
               </div>
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="email" className="block text-[13px] text-slate-500 dark:text-slate-400">
-                Email
+              <label
+                htmlFor="password"
+                className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"
+              >
+                Password
               </label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@school.edu"
-                required
-                autoComplete="email"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label htmlFor="password" className="block text-[13px] text-slate-500 dark:text-slate-400">
-                  Password
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((s) => !s)}
-                  className="text-[12px] text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-300"
-                >
-                  {showPassword ? 'Hide' : 'Show'}
-                </button>
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3.5 top-1/2 z-[1] -translate-y-1/2 text-slate-400">
+                  <LockIcon />
+                </span>
+                <PasswordInput
+                  id="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  className="[&_input]:rounded-xl [&_input]:border-brand-200/80 [&_input]:py-3 [&_input]:pl-11 [&_input]:shadow-none [&_input]:focus:border-brand-500 dark:[&_input]:border-slate-600"
+                />
               </div>
-              <Input
-                id="password"
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-              />
             </div>
 
-            <Button type="submit" size="lg" className="mt-2 w-full" disabled={loading}>
-              {loading ? 'Signing in…' : 'Continue'}
+            <div className="flex items-center justify-between gap-3 pt-0.5">
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={remember}
+                  onChange={(e) => setRemember(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500/30"
+                />
+                Remember me
+              </label>
+              <span className="text-sm text-slate-400">Need help? Ask your admin</span>
+            </div>
+
+            <Button
+              type="submit"
+              size="lg"
+              className="mt-2 w-full rounded-xl py-3.5 text-[15px] font-semibold"
+              disabled={loading || (!isMasterLogin && !!brandingError)}
+            >
+              {loading ? 'Signing in…' : 'Login'}
             </Button>
           </form>
 
-          <p className="mt-14 text-center text-[13px] text-slate-400/80">
-            <Link
-              className="underline underline-offset-4 transition-colors hover:text-brand-700 dark:hover:text-brand-300"
-              to="/platform/login"
-            >
-              Platform admin
-            </Link>
+          <p className="mt-10 text-center text-sm text-slate-500">
+            Don&apos;t have an account?{' '}
+            <span className="font-semibold text-brand-700 dark:text-brand-300">Contact your administrator</span> for
+            access.
           </p>
         </div>
       </main>
