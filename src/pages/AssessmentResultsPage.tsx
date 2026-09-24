@@ -17,6 +17,7 @@ import {
   type ExamKind,
 } from '@/hooks/api/useAssessments';
 import { useAcademicYearsQuery } from '@/hooks/api/useAcademicYears';
+import { CaptureGallery } from '@/components/assessments/CaptureGallery';
 
 function formatDuration(seconds: number | null | undefined) {
   if (seconds == null || Number.isNaN(seconds)) return '—';
@@ -149,6 +150,7 @@ export function AssessmentResultsPage({ kind = 'assessment' }: { kind?: ExamKind
   );
   const { reattempt, hideResult, deleteResult, releaseResults } = useAssessmentMutations();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [capturesFor, setCapturesFor] = useState<{ id: string; name: string } | null>(null);
   const [busyAction, setBusyAction] = useState<'reattempt' | 'hide' | 'delete' | null>(null);
 
   const ranked = useMemo(() => withRanks(data?.results || []), [data?.results]);
@@ -457,6 +459,15 @@ export function AssessmentResultsPage({ kind = 'assessment' }: { kind?: ExamKind
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex flex-wrap gap-2">
+                              {kind === 'online_exam' ? (
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => setCapturesFor({ id: row.id, name })}
+                                >
+                                  Captures
+                                </Button>
+                              ) : null}
                               <Button
                                 size="sm"
                                 variant="secondary"
@@ -532,6 +543,14 @@ export function AssessmentResultsPage({ kind = 'assessment' }: { kind?: ExamKind
               </div>
             </Card>
           )}
+
+          {capturesFor ? (
+            <CaptureGallery
+              assignmentId={capturesFor.id}
+              studentName={capturesFor.name}
+              onClose={() => setCapturesFor(null)}
+            />
+          ) : null}
 
           <p className="text-xs text-slate-400">
             <Badge tone="neutral">Note</Badge>{' '}

@@ -5,6 +5,7 @@ import clsx from 'clsx';
 import { Badge, Card, Skeleton } from '@/components/ui';
 import { AssessmentFormRunner } from '@/components/assessments/AssessmentFormRunner';
 import { CbtAttemptRunner } from '@/components/assessments/CbtAttemptRunner';
+import { ExamReadinessGate } from '@/components/assessments/ExamReadinessGate';
 import { useAuth } from '@/context/AuthContext';
 import {
   recordFullscreenExit,
@@ -20,11 +21,35 @@ export function TakeAssessmentPage({ kind = 'assessment' }: { kind?: ExamKind })
   const { assignmentId } = useParams<{ assignmentId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data, isLoading, isError, error: loadError, refetch } = useAssignmentQuery(assignmentId);
+  const [admitted, setAdmitted] = useState(false);
+  const [bypassCamera, setBypassCamera] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const cameraRef = useRef<MediaStream | null>(null);
+  cameraRef.current = cameraStream;
+  const { data, isLoading, isError, isPlaceholderData, error: loadError, refetch } = useAssignmentQuery(
+    assignmentId,
+    { preview: online && !admitted && !bypassCamera }
+  );
   const { submit } = useAssessmentMutations();
   const [error, setError] = useState<string | null>(null);
-
   const isSubmitted = data?.assignment.status === 'submitted';
+
+  useEffect(() => {
+    return () => {
+      cameraRef.current?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isSubmitted) return;
+    cameraRef.current?.getTracks().forEach((track) => track.stop());
+  }, [isSubmitted]);
+
+  useEffect(() => {
+    if (!online || !data?.assessment || data.assessment.cameraMonitor) return;
+    const untimed = (data.assessment.durationMinutes ?? 60) <= 0;
+    if (!data.assignment.startedAt && !untimed) setBypassCamera(true);
+  }, [online, data]);
 
   const answerMap = useMemo(() => {
     if (!isSubmitted || !data?.assignment.answers) return new Map();
@@ -95,7 +120,24 @@ export function TakeAssessmentPage({ kind = 'assessment' }: { kind?: ExamKind })
             {error}
           </div>
         ) : null}
-        {online ? (
+        {online && assessment.cameraMonitor && (!admitted || isPlaceholderData) ? (
+          <ExamReadinessGate
+            title={assessment.title}
+            durationMinutes={assessment.durationMinutes ?? 60}
+            alreadyStarted={Boolean(assignment.startedAt)}
+            backTo={mine}
+            starting={admitted}
+            onProceed={(stream) => {
+              setCameraStream(stream);
+              setAdmitted(true);
+            }}
+          />
+        ) : online && !assessment.cameraMonitor && isPlaceholderData && !assignment.startedAt ? (
+          <div className="mx-auto max-w-2xl space-y-4">
+            <Skeleton className="h-8 w-40" />
+            <Skeleton className="h-28" />
+          </div>
+        ) : online ? (
           <CbtAttemptRunner
             title={assessment.title}
             studentName={studentName}
@@ -107,9 +149,12 @@ export function TakeAssessmentPage({ kind = 'assessment' }: { kind?: ExamKind })
             }
             storageKey={`assessment-answers-${assignment.id}`}
             submitting={submit.isPending}
+            assignmentId={assignment.id}
             lockFullscreen
             fullscreenExitCount={assignment.fullscreenExitCount || 0}
             maxFullscreenExits={assignment.maxFullscreenExits || 3}
+            cameraStream={assessment.cameraMonitor ? cameraStream : null}
+            onCameraStream={assessment.cameraMonitor ? setCameraStream : undefined}
             onFullscreenExit={
               assignmentId ? () => recordFullscreenExit(assignmentId) : undefined
             }

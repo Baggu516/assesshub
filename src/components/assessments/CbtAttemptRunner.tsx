@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
-import type { AssessmentQuestion } from '@/hooks/api/useAssessments';
+import { uploadProctorCapture, type AssessmentQuestion } from '@/hooks/api/useAssessments';
 
 export type CbtAnswerState = {
   selectedOptionIds: string[];
@@ -122,6 +122,9 @@ export function CbtAttemptRunner({
   fullscreenExitCount = 0,
   maxFullscreenExits = 3,
   onFullscreenExit,
+  cameraStream = null,
+  onCameraStream,
+  assignmentId,
 }: {
   title: string;
   studentName?: string;
@@ -139,8 +142,14 @@ export function CbtAttemptRunner({
   fullscreenExitCount?: number;
   maxFullscreenExits?: number;
   onFullscreenExit?: () => Promise<{ fullscreenExitCount?: number; forceSubmit?: boolean } | void>;
+  cameraStream?: MediaStream | null;
+  onCameraStream?: (stream: MediaStream) => void;
+  assignmentId?: string;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const cameraRef = useRef<HTMLVideoElement>(null);
+  const [liveCamera, setLiveCamera] = useState<MediaStream | null>(cameraStream);
+  const [cameraLive, setCameraLive] = useState(Boolean(cameraStream?.getVideoTracks()[0]));
   const submittedRef = useRef(false);
   const exitHandlingRef = useRef(false);
   const onExitRef = useRef(onFullscreenExit);
@@ -205,6 +214,92 @@ export function CbtAttemptRunner({
     [buildPayload, onSubmit]
   );
   handleSubmitRef.current = handleSubmit;
+
+  useEffect(() => {
+    setLiveCamera(cameraStream);
+  }, [cameraStream]);
+
+  useEffect(() => {
+    const video = cameraRef.current;
+    const stream = liveCamera;
+    if (!video || !stream) return undefined;
+    video.srcObject = stream;
+    video.play().catch(() => {});
+    const track = stream.getVideoTracks()[0];
+    if (!track) {
+      setCameraLive(false);
+      return undefined;
+    }
+    const sync = () => setCameraLive(track.readyState === 'live' && track.enabled);
+    sync();
+    track.addEventListener('ended', sync);
+    track.addEventListener('mute', sync);
+    track.addEventListener('unmute', sync);
+    return () => {
+      track.removeEventListener('ended', sync);
+      track.removeEventListener('mute', sync);
+      track.removeEventListener('unmute', sync);
+    };
+  }, [liveCamera]);
+
+  useEffect(() => {
+    if (!assignmentId || !liveCamera || !cameraLive) return undefined;
+    const video = cameraRef.current;
+    if (!video) return undefined;
+    const sample = document.createElement('canvas');
+    const shot = document.createElement('canvas');
+    const sampleCtx = sample.getContext('2d', { willReadFrequently: true });
+    const shotCtx = shot.getContext('2d');
+    if (!sampleCtx || !shotCtx) return undefined;
+    const started = Date.now();
+    let prev: Uint8ClampedArray | null = null;
+    let lastSent = 0;
+    let sentFirst = false;
+    let sending = false;
+
+    const timer = window.setInterval(() => {
+      if (sending || video.readyState < 2 || video.videoWidth === 0) return;
+      sample.width = 48;
+      sample.height = 36;
+      sampleCtx.drawImage(video, 0, 0, 48, 36);
+      const frame = sampleCtx.getImageData(0, 0, 48, 36).data;
+      let diff = 0;
+      if (prev) {
+        let changed = 0;
+        let samples = 0;
+        for (let i = 0; i < frame.length; i += 16) {
+          samples += 1;
+          const delta =
+            Math.abs(frame[i] - prev[i]) +
+            Math.abs(frame[i + 1] - prev[i + 1]) +
+            Math.abs(frame[i + 2] - prev[i + 2]);
+          if (delta > 48) changed += 1;
+        }
+        diff = samples ? changed / samples : 0;
+      }
+      const moved = diff > 0.18;
+      const wantFirst = !sentFirst && Date.now() - started > 2000;
+      prev = new Uint8ClampedArray(frame);
+      if (!wantFirst && !moved) return;
+      if (Date.now() - lastSent < 12000) return;
+      const width = 320;
+      const height = Math.max(1, Math.round((video.videoHeight / video.videoWidth) * width));
+      shot.width = width;
+      shot.height = height;
+      shotCtx.drawImage(video, 0, 0, width, height);
+      const image = shot.toDataURL('image/jpeg', 0.55);
+      sending = true;
+      lastSent = Date.now();
+      sentFirst = true;
+      uploadProctorCapture(assignmentId, image)
+        .catch(() => {})
+        .finally(() => {
+          sending = false;
+        });
+    }, 800);
+
+    return () => window.clearInterval(timer);
+  }, [assignmentId, liveCamera, cameraLive]);
 
   useEffect(() => {
     if (!lockFullscreen) return undefined;
@@ -334,6 +429,32 @@ export function CbtAttemptRunner({
 
   return (
     <div ref={rootRef} className="fixed inset-0 z-[80] flex flex-col bg-[#f4f6f8] text-slate-900">
+      {lockFullscreen && liveCamera && !cameraLive ? (
+        <div className="absolute inset-0 z-[95] flex items-center justify-center bg-slate-900/80 p-6">
+          <div className="max-w-md rounded-2xl bg-white p-6 text-center shadow-xl">
+            <h2 className="text-xl font-bold text-slate-900">Turn the camera back on</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Video stopped. Allow the camera again to keep working on the exam.
+            </p>
+            <button
+              type="button"
+              className="mt-5 inline-flex items-center justify-center rounded-xl bg-[#1e3a5f] px-5 py-2.5 text-sm font-bold text-white"
+              onClick={() => {
+                navigator.mediaDevices
+                  ?.getUserMedia({ audio: false, video: { facingMode: 'user' } })
+                  .then((stream) => {
+                    liveCamera.getTracks().forEach((track) => track.stop());
+                    setLiveCamera(stream);
+                    onCameraStream?.(stream);
+                  })
+                  .catch(() => setCameraLive(false));
+              }}
+            >
+              Enable camera
+            </button>
+          </div>
+        </div>
+      ) : null}
       {lockFullscreen && needsFullscreenGesture ? (
         <div className="absolute inset-0 z-[90] flex items-center justify-center bg-slate-900/70 p-6">
           <div className="max-w-md rounded-2xl bg-white p-6 text-center shadow-xl">
@@ -375,6 +496,17 @@ export function CbtAttemptRunner({
               <span className="rounded-md bg-white/15 px-3 py-1.5 text-xs font-semibold">Untimed</span>
             )}
             <span className="font-medium">{studentName || 'Student'}</span>
+            {lockFullscreen && liveCamera ? (
+              <span className="relative h-10 w-14 overflow-hidden rounded-md bg-black ring-1 ring-white/40">
+                <video
+                  ref={cameraRef}
+                  autoPlay
+                  muted
+                  playsInline
+                  className="h-full w-full -scale-x-100 object-cover"
+                />
+              </span>
+            ) : null}
             {lockFullscreen ? (
               <span className="rounded-md bg-amber-500/90 px-2.5 py-1 text-xs font-bold text-slate-900">
                 FS exits left: {exitsRemaining}/{maxFullscreenExits}

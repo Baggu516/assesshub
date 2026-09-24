@@ -621,6 +621,7 @@ export function AssessmentBuilderPage({ kind = 'assessment' }: { kind?: ExamKind
   const [startAt, setStartAt] = useState(defaultStartLocal);
   const [endAt, setEndAt] = useState(defaultEndLocal);
   const [durationMinutes, setDurationMinutes] = useState(60);
+  const [cameraMonitor, setCameraMonitor] = useState(false);
 
   const [launchStatus, setLaunchStatus] = useState<'draft' | 'published'>('draft');
   const [hydrated, setHydrated] = useState(!isEdit);
@@ -649,6 +650,7 @@ export function AssessmentBuilderPage({ kind = 'assessment' }: { kind?: ExamKind
     setTitle(existing.title);
     setDescription(existing.description || '');
     setDurationMinutes(existing.durationMinutes ?? 60);
+    setCameraMonitor(existing.cameraMonitor === true);
     setNegativeMarkPerWrong(existing.negativeMarkPerWrong ?? 0);
     setAllowPartialCredit(existing.allowPartialCredit !== false);
     setShowAnswersAfterSubmit(existing.showAnswersAfterSubmit !== false);
@@ -749,6 +751,7 @@ export function AssessmentBuilderPage({ kind = 'assessment' }: { kind?: ExamKind
       negativeMarkPerWrong: Number(negativeMarkPerWrong) || 0,
       allowPartialCredit,
       showAnswersAfterSubmit,
+      cameraMonitor: kind === 'online_exam' && cameraMonitor,
       sections: cleanSections.length ? cleanSections : ['Section A'],
       questions: questions.map((q, i) => ({
         ...q,
@@ -1266,6 +1269,22 @@ export function AssessmentBuilderPage({ kind = 'assessment' }: { kind?: ExamKind
               onChange={(e) => setDurationMinutes(Number(e.target.value) || 0)}
             />
           </FormField>
+          {online ? (
+            <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 px-4 py-3 dark:border-slate-700">
+              <div>
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">Camera monitor</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Students must turn the camera on before the exam starts. Leave this off to run the exam without a camera.
+                </p>
+              </div>
+              <Toggle
+                id="camera-monitor"
+                checked={cameraMonitor}
+                onChange={setCameraMonitor}
+                aria-label="Camera monitor"
+              />
+            </div>
+          ) : null}
           <div className="flex justify-between gap-2 pt-2">
             <Button type="button" variant="secondary" onClick={() => setStep(2)}>
               Back
@@ -1319,6 +1338,7 @@ export function AssessmentBuilderPage({ kind = 'assessment' }: { kind?: ExamKind
               <li>
                 {durationMinutes} min · {startAt ? new Date(startAt).toLocaleString() : '—'} →{' '}
                 {endAt ? new Date(endAt).toLocaleString() : '—'}
+                {online ? ` · Camera ${cameraMonitor ? 'on' : 'off'}` : ''}
               </li>
             </ul>
           </div>

@@ -35,6 +35,7 @@ export interface Assessment {
   negativeMarkPerWrong?: number;
   allowPartialCredit?: boolean;
   showAnswersAfterSubmit?: boolean;
+  cameraMonitor?: boolean;
   sections?: string[];
   status: 'draft' | 'published' | 'closed';
   resultsReleased?: boolean;
@@ -124,6 +125,7 @@ export type AssessmentPayload = {
   negativeMarkPerWrong?: number;
   allowPartialCredit?: boolean;
   showAnswersAfterSubmit?: boolean;
+  cameraMonitor?: boolean;
   sections?: string[];
   questions: AssessmentQuestion[];
   kind?: ExamKind;
@@ -182,6 +184,10 @@ export function useMyAssignmentsQuery(academicYearId?: string, kind?: ExamKind) 
   });
 }
 
+export async function uploadProctorCapture(assignmentId: string, image: string) {
+  await api.post(`/assessments/assignments/${assignmentId}/captures`, { image });
+}
+
 export async function recordFullscreenExit(assignmentId: string) {
   const { data } = await api.post<{
     fullscreenExitCount: number;
@@ -192,13 +198,19 @@ export async function recordFullscreenExit(assignmentId: string) {
   return data;
 }
 
-export function useAssignmentQuery(assignmentId: string | undefined) {
+export function useAssignmentQuery(assignmentId: string | undefined, options?: { preview?: boolean }) {
+  const preview = Boolean(options?.preview);
   return useQuery({
-    queryKey: ['assessments', 'assignments', assignmentId],
+    queryKey: ['assessments', 'assignments', assignmentId, preview ? 'preview' : 'live'],
     enabled: Boolean(assignmentId),
+    placeholderData: (previous) => {
+      if (!previous || previous.assignment.id !== assignmentId) return undefined;
+      return previous;
+    },
     queryFn: async () => {
       const { data } = await api.get<{ assignment: AssessmentAssignment; assessment: Assessment }>(
-        `/assessments/assignments/${assignmentId}`
+        `/assessments/assignments/${assignmentId}`,
+        { params: preview ? { preview: '1' } : undefined }
       );
       return data;
     },
