@@ -336,7 +336,7 @@ export function AppLayout() {
     <div className="h-dvh flex overflow-hidden bg-[rgb(var(--surface))]">
       <aside
         className={clsx(
-          'hidden md:flex flex-col border-r border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-950/80 backdrop-blur transition-[width] duration-200 ease-out shrink-0 h-full',
+          'group/sidebar hidden md:flex flex-col border-r border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-950/80 backdrop-blur transition-[width] duration-200 ease-out shrink-0 h-full',
           collapsed ? 'w-[76px]' : 'w-64'
         )}
       >
@@ -344,27 +344,43 @@ export function AppLayout() {
           <div
             className={clsx(
               'flex items-center min-w-0 flex-1 overflow-hidden',
-              collapsed ? 'justify-center pl-0' : 'px-3'
+              collapsed ? 'relative justify-center pl-0' : 'px-3'
             )}
           >
-            <ClassTrioMark className="h-8 w-8 shrink-0" />
+            <ClassTrioMark
+              className={clsx(
+                'h-8 w-8 shrink-0 transition-opacity',
+                collapsed && 'group-hover/sidebar:opacity-0 group-focus-within/sidebar:opacity-0'
+              )}
+            />
             {!collapsed ? (
-              <>
-                <span className="ml-2.5 font-semibold text-slate-900 dark:text-white truncate">ClassTrio</span>
-                <span className="ml-2 text-xs text-slate-500 shrink-0 hidden xl:inline">Education</span>
-              </>
+              <span className="ml-2.5 font-semibold text-slate-900 dark:text-white truncate">ClassTrio</span>
+            ) : null}
+            {collapsed ? (
+              <button
+                type="button"
+                onClick={() => setCollapsed(false)}
+                className="absolute inset-0 flex items-center justify-center rounded-lg text-slate-500 opacity-0 pointer-events-none group-hover/sidebar:pointer-events-auto group-hover/sidebar:opacity-100 group-focus-within/sidebar:pointer-events-auto group-focus-within/sidebar:opacity-100 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                title="Expand sidebar"
+                aria-expanded={false}
+                aria-label="Expand sidebar"
+              >
+                <SidebarToggleGlyph collapsed />
+              </button>
             ) : null}
           </div>
-          <button
-            type="button"
-            onClick={() => setCollapsed((c) => !c)}
-            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200"
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            aria-expanded={!collapsed}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            <SidebarToggleGlyph collapsed={collapsed} />
-          </button>
+          {!collapsed ? (
+            <button
+              type="button"
+              onClick={() => setCollapsed(true)}
+              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200"
+              title="Collapse sidebar"
+              aria-expanded
+              aria-label="Collapse sidebar"
+            >
+              <SidebarToggleGlyph collapsed={false} />
+            </button>
+          ) : null}
         </div>
         <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto scrollbar-thin">
           {visibleItems.map((item) => (
