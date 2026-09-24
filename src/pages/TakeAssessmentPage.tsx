@@ -478,7 +478,9 @@ function StudentResultView({
 
   return (
     <div className="absolute inset-0 z-10 overflow-y-auto bg-[linear-gradient(115deg,#e8f7f0_0%,#f4f8f5_46%,#f8f0e6_100%)] dark:bg-[linear-gradient(115deg,#10211c_0%,#121820_52%,#211c16_100%)]">
-      <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col px-4 py-8 md:px-8">
+      <div className="relative flex min-h-full flex-col">
+      <ConfettiBurst />
+      <div className="relative z-10 mx-auto flex min-h-full w-full max-w-5xl flex-col px-4 py-8 md:px-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-800/80 dark:text-emerald-200/80">
@@ -560,6 +562,7 @@ function StudentResultView({
             Your teacher has not released the answer key for this test.
           </div>
         )}
+      </div>
       </div>
     </div>
   );
