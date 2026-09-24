@@ -230,12 +230,6 @@ export function LoginPage() {
             <p className="mt-5 max-w-md text-[15px] leading-relaxed text-slate-600">
               Worksheets, assessments, and online exams in one place, with AI chat when a school turns it on.
             </p>
-
-            {branding?.logoUrl ? (
-              <div className="mt-10 flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-white/70 p-2 ring-1 ring-brand-200/80">
-                <img src={branding.logoUrl} alt="" className="max-h-full max-w-full object-contain" />
-              </div>
-            ) : null}
           </div>
 
           <div className="relative z-10 space-y-6 motion-safe:animate-rise-in motion-safe:[animation-delay:160ms]">
