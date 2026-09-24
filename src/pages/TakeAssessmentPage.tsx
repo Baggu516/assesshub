@@ -20,7 +20,7 @@ export function TakeAssessmentPage({ kind = 'assessment' }: { kind?: ExamKind })
   const { assignmentId } = useParams<{ assignmentId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data, isLoading, refetch } = useAssignmentQuery(assignmentId);
+  const { data, isLoading, isError, error: loadError, refetch } = useAssignmentQuery(assignmentId);
   const { submit } = useAssessmentMutations();
   const [error, setError] = useState<string | null>(null);
 
@@ -70,9 +70,12 @@ export function TakeAssessmentPage({ kind = 'assessment' }: { kind?: ExamKind })
   }
 
   if (!data) {
+    const unavailable =
+      (loadError as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+      (isError ? 'This assessment is not available yet.' : 'Assessment not found.');
     return (
       <Card className="mx-auto max-w-lg p-8 text-center text-sm text-slate-500">
-        Assessment not found.{' '}
+        {unavailable}{' '}
         <Link to={mine} className="text-brand-600 hover:underline dark:text-brand-400">
           Back to list
         </Link>

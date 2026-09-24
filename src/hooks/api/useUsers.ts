@@ -27,9 +27,9 @@ export function usePermissionsCatalogQuery() {
   return useQuery({
     queryKey: ['permissions-catalog'],
     queryFn: async () => {
-      const { data } = await api.get<{ permissions: { key: string; label: string; description?: string }[] }>(
-        '/permissions'
-      );
+      const { data } = await api.get<{
+        permissions: { key: string; label: string; description?: string; feature?: string | null; roles?: string[] }[];
+      }>('/permissions');
       return data.permissions;
     },
   });

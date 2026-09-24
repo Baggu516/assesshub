@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Badge, Button, Card, CardStat, FormField, Input, PasswordInput } from '@/components/ui';
+import { PERMISSION_LABELS } from '@/constants/permissionLabels';
 import { useAuth } from '@/context/AuthContext';
 import { useUserMutations } from '@/hooks/api/useUsers';
 
@@ -111,9 +112,13 @@ export function ProfilePage() {
       <Card>
         <h2 className="text-sm font-semibold mb-2 text-slate-900 dark:text-white">Effective permissions</h2>
         <div className="flex flex-wrap gap-2">
-          {user.permissions.map((p) => (
-            <Badge key={p}>{p}</Badge>
-          ))}
+          {user.permissions.length === 0 ? (
+            <span className="text-sm text-slate-500">No permissions</span>
+          ) : (
+            user.permissions.map((p) => (
+              <Badge key={p}>{PERMISSION_LABELS[p] ?? p}</Badge>
+            ))
+          )}
         </div>
       </Card>
     </div>

@@ -10,7 +10,9 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { PasswordInput } from '@/components/ui/PasswordInput';
 import { useAuth } from '@/context/AuthContext';
 import { PERMISSIONS } from '@/constants/permissions';
-import { formatPermissionList } from '@/constants/permissionLabels';
+import { formatPermissionList, permissionVisibleFor } from '@/constants/permissionLabels';
+import { resolveOrgFeatures } from '@/lib/sessionCache';
+import { useTenantOrganization } from '@/hooks/api/useTenant';
 import {
   usePermissionsCatalogQuery,
   useSubordinatesQuery,
@@ -48,11 +50,14 @@ function InviteSubordinateModal({
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={() => {
+        if (saving) return;
+        onClose();
+      }}
       title="Add teacher"
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
           <Button type="submit" form="invite-teacher-form" disabled={!canCreate || saving}>
@@ -170,11 +175,14 @@ function SubordinateEditModal({
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={() => {
+        if (saving) return;
+        onClose();
+      }}
       title="Edit teacher"
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
           <Button type="submit" form="edit-teacher-form" disabled={saving}>
@@ -260,6 +268,8 @@ function SubordinateEditModal({
 
 export function SubordinatesPage() {
   const { user } = useAuth();
+  const { data: org } = useTenantOrganization();
+  const features = resolveOrgFeatures(org);
   const [search, setSearch] = useState('');
   const { data, isLoading, refetch } = useSubordinatesQuery(true, user?.id);
   const { createSubordinate, updateUser } = useUserMutations();
@@ -294,14 +304,11 @@ export function SubordinatesPage() {
   const assignableKeySet = useMemo(() => {
     if (!user || !catalog) return new Set<string>();
     const keys = new Set<string>();
-    const my = user.permissions as string[];
     for (const row of catalog) {
-      const key = row.key;
-      if (my.includes(PERMISSIONS.SETTINGS_MANAGE)) keys.add(key);
-      else if (my.includes(key)) keys.add(key);
+      if (permissionVisibleFor(row, 'subordinate', features)) keys.add(row.key);
     }
     return keys;
-  }, [user, catalog]);
+  }, [user, catalog, features]);
 
   const filteredRows = useMemo(() => {
     const rows = data ?? [];
@@ -374,7 +381,11 @@ export function SubordinatesPage() {
           form={form}
           setForm={setForm}
           saving={createSubordinate.isPending}
-          onClose={() => setInviteOpen(false)}
+          onClose={() => {
+            if (createSubordinate.isPending) return;
+            setForm({ email: '', password: '', firstName: '', lastName: '' });
+            setInviteOpen(false);
+          }}
           onSubmit={onSubmitInvite}
         />
       )}
@@ -388,7 +399,10 @@ export function SubordinatesPage() {
           assignableKeys={assignableKeySet}
           canEditPermissionsSection={canEditPermissionsSection}
           saving={updateUser.isPending}
-          onClose={() => setEditTarget(null)}
+          onClose={() => {
+            if (updateUser.isPending) return;
+            setEditTarget(null);
+          }}
           onSave={onSaveEdit}
         />
       )}

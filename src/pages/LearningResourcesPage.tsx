@@ -51,6 +51,8 @@ export function LearningResourcesPage({ kind }: { kind: ResourceKind }) {
   const [file, setFile] = useState<File | null>(null);
   const [published, setPublished] = useState(true);
   const [busyId, setBusyId] = useState('');
+  const [fileInputKey, setFileInputKey] = useState(0);
+  const saving = create.isPending || update.isPending;
 
   const classOptions = useMemo(
     () => classes.map((c) => ({ id: c.id, label: c.academicYear ? `${c.name} · ${c.academicYear}` : c.name })),
@@ -66,7 +68,22 @@ export function LearningResourcesPage({ kind }: { kind: ResourceKind }) {
     setEndAt(toLocal(item?.endAt));
     setFile(null);
     setPublished(item ? item.isPublished : true);
+    setFileInputKey((key) => key + 1);
     setOpen(true);
+  };
+
+  const closeModal = () => {
+    if (saving) return;
+    setOpen(false);
+    setEditing(null);
+    setTitle('');
+    setDescription('');
+    setClassIds([]);
+    setStartAt('');
+    setEndAt('');
+    setFile(null);
+    setPublished(true);
+    setFileInputKey((key) => key + 1);
   };
 
   const save = async () => {
@@ -98,6 +115,15 @@ export function LearningResourcesPage({ kind }: { kind: ResourceKind }) {
       else await create.mutateAsync(payload);
       toast.success(editing ? 'Saved' : 'Created');
       setOpen(false);
+      setEditing(null);
+      setTitle('');
+      setDescription('');
+      setClassIds([]);
+      setStartAt('');
+      setEndAt('');
+      setFile(null);
+      setPublished(true);
+      setFileInputKey((key) => key + 1);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
       toast.error(msg || 'Could not save');
@@ -213,7 +239,7 @@ export function LearningResourcesPage({ kind }: { kind: ResourceKind }) {
 
       <Modal
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={closeModal}
         title={editing ? 'Edit worksheet' : 'New worksheet'}
       >
         <div className="space-y-4">
@@ -247,6 +273,7 @@ export function LearningResourcesPage({ kind }: { kind: ResourceKind }) {
           </FormField>
           <FormField label="PDF or Word file">
             <Input
+              key={fileInputKey}
               type="file"
               accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               onChange={(e) => setFile(e.target.files?.[0] || null)}
@@ -268,11 +295,11 @@ export function LearningResourcesPage({ kind }: { kind: ResourceKind }) {
             Published for students
           </label>
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setOpen(false)}>
+            <Button variant="secondary" onClick={closeModal} disabled={saving}>
               Cancel
             </Button>
-            <Button onClick={save} disabled={create.isPending || update.isPending}>
-              Save
+            <Button onClick={save} disabled={saving}>
+              {saving ? 'Saving…' : 'Save'}
             </Button>
           </div>
         </div>

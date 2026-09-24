@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/Card';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -41,6 +41,20 @@ function YearFormModal({
   );
   const [isCurrent, setIsCurrent] = useState(initial?.isCurrent || false);
 
+  useEffect(() => {
+    if (!open) {
+      setLabel('');
+      setStartDate('');
+      setEndDate('');
+      setIsCurrent(false);
+      return;
+    }
+    setLabel(initial?.label || '');
+    setStartDate(initial?.startDate ? String(initial.startDate).slice(0, 10) : '');
+    setEndDate(initial?.endDate ? String(initial.endDate).slice(0, 10) : '');
+    setIsCurrent(Boolean(initial?.isCurrent));
+  }, [open, initial]);
+
   const canSave = label.trim().length > 0;
 
   const handleSubmit = (e: FormEvent) => {
@@ -57,12 +71,15 @@ function YearFormModal({
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={() => {
+        if (saving) return;
+        onClose();
+      }}
       title={initial ? 'Edit academic year' : 'New academic year'}
       description="Classes and enrollments are scoped to a year."
       footer={
         <>
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
           <Button type="submit" form="year-form" disabled={!canSave || saving}>

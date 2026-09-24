@@ -52,6 +52,7 @@ export type CachedTenantOrganization = {
   id: string;
   name: string;
   subdomain: string;
+  dbName?: string | null;
   isActive: boolean;
   plan?: OrgPlan;
   features?: OrgFeatures;

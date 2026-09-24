@@ -12,9 +12,10 @@ import { Modal } from '@/components/ui/Modal';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PasswordInput } from '@/components/ui/PasswordInput';
 import { PERMISSIONS } from '@/constants/permissions';
-import { formatPermissionList } from '@/constants/permissionLabels';
+import { formatPermissionList, permissionVisibleFor } from '@/constants/permissionLabels';
+import { resolveOrgFeatures } from '@/lib/sessionCache';
+import { useTenantOrganization } from '@/hooks/api/useTenant';
 import {
-  ORG_LEVEL_KEYS,
   usePermissionsCatalogQuery,
   useUserMutations,
   useUsersQuery,
@@ -64,7 +65,10 @@ function AddTeamMemberModal({
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={() => {
+        if (busy) return;
+        onClose();
+      }}
       title="Add student"
       description="Create with password, or send an email invite."
       footer={
@@ -140,7 +144,7 @@ function EditUserModal({
   open: boolean;
   target: UserListRow;
   viewer: AuthUser;
-  catalog: { key: string; label: string; description?: string }[] | undefined;
+  catalog: { key: string; label: string; description?: string; feature?: string | null; roles?: string[] }[] | undefined;
   assignableKeys: Set<string>;
   canEditPermissionsSection: boolean;
   onClose: () => void;
@@ -183,11 +187,14 @@ function EditUserModal({
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={() => {
+        if (saving) return;
+        onClose();
+      }}
       title="Edit student"
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
           <Button type="submit" form="edit-student-form" disabled={saving}>
@@ -273,6 +280,8 @@ function EditUserModal({
 
 export function UsersPage() {
   const { user } = useAuth();
+  const { data: org } = useTenantOrganization();
+  const features = resolveOrgFeatures(org);
   const [search, setSearch] = useState('');
   const [classTab, setClassTab] = useState<string>('all');
   const isAdmin = user?.hierarchyRole === 'admin';
@@ -310,16 +319,11 @@ export function UsersPage() {
   const assignableKeySet = useMemo(() => {
     if (!user || !catalog || !isAdmin) return new Set<string>();
     const keys = new Set<string>();
-    const my = user.permissions as string[];
     for (const row of catalog) {
-      if (my.includes(PERMISSIONS.SETTINGS_MANAGE)) keys.add(row.key);
-      else if (my.includes(row.key) && !ORG_LEVEL_KEYS.has(row.key)) keys.add(row.key);
-      else if (my.includes(row.key) && row.key !== PERMISSIONS.SETTINGS_MANAGE) {
-        keys.add(row.key);
-      }
+      if (permissionVisibleFor(row, 'user', features)) keys.add(row.key);
     }
     return keys;
-  }, [user, catalog, isAdmin]);
+  }, [user, catalog, isAdmin, features]);
 
   const memberRows = useMemo(
     () => (data?.users ?? []).filter((u) => u.hierarchyRole === 'user'),
@@ -437,7 +441,11 @@ export function UsersPage() {
           open={addModalOpen}
           member={member}
           setMember={setMember}
-          onClose={() => setAddModalOpen(false)}
+          onClose={() => {
+            if (createMember.isPending || invite.isPending) return;
+            setMember({ email: '', password: '', firstName: '', lastName: '' });
+            setAddModalOpen(false);
+          }}
           onCreateUser={runCreateMember}
           onInviteOnly={runInviteOnly}
           createPending={createMember.isPending}
@@ -455,7 +463,10 @@ export function UsersPage() {
           assignableKeys={assignableKeySet}
           canEditPermissionsSection={canEditPermissionsSection}
           saving={updateUser.isPending}
-          onClose={() => setEditTarget(null)}
+          onClose={() => {
+            if (updateUser.isPending) return;
+            setEditTarget(null);
+          }}
           onSave={onSaveEdit}
         />
       )}

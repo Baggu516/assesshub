@@ -197,7 +197,7 @@ export default function App() {
           path="group-students"
           element={
             <RequireHierarchy roles={['subordinate']}>
-              <RequirePermission keys={[PERMISSIONS.ASSESSMENT_CREATE]}>
+              <RequirePermission keys={[PERMISSIONS.ASSESSMENT_CREATE, PERMISSIONS.ONLINE_EXAM_CREATE]}>
                 <GroupStudentsPage />
               </RequirePermission>
             </RequireHierarchy>
@@ -208,7 +208,9 @@ export default function App() {
           element={
             <RequireFeature feature="worksheets">
               <RequireHierarchy roles={['subordinate', 'user']}>
-                <LearningResourcesPage kind="worksheet" />
+                <RequirePermission keys={[PERMISSIONS.WORKSHEET_VIEW, PERMISSIONS.WORKSHEET_MANAGE]}>
+                  <LearningResourcesPage kind="worksheet" />
+                </RequirePermission>
               </RequireHierarchy>
             </RequireFeature>
           }
@@ -266,7 +268,7 @@ export default function App() {
           element={
             <RequireFeature feature="onlineExams">
               <RequireHierarchy roles={['subordinate']}>
-                <RequirePermission keys={[PERMISSIONS.ASSESSMENT_CREATE]}>
+                <RequirePermission keys={[PERMISSIONS.ONLINE_EXAM_CREATE]}>
                   <AssessmentsPage kind="online_exam" />
                 </RequirePermission>
               </RequireHierarchy>
@@ -278,7 +280,7 @@ export default function App() {
           element={
             <RequireFeature feature="onlineExams">
               <RequireHierarchy roles={['subordinate']}>
-                <RequirePermission keys={[PERMISSIONS.ASSESSMENT_CREATE]}>
+                <RequirePermission keys={[PERMISSIONS.ONLINE_EXAM_CREATE]}>
                   <AssessmentBuilderPage kind="online_exam" />
                 </RequirePermission>
               </RequireHierarchy>
@@ -290,7 +292,7 @@ export default function App() {
           element={
             <RequireFeature feature="onlineExams">
               <RequireHierarchy roles={['subordinate']}>
-                <RequirePermission keys={[PERMISSIONS.ASSESSMENT_CREATE]}>
+                <RequirePermission keys={[PERMISSIONS.ONLINE_EXAM_CREATE]}>
                   <AssessmentBuilderPage kind="online_exam" />
                 </RequirePermission>
               </RequireHierarchy>
@@ -302,7 +304,7 @@ export default function App() {
           element={
             <RequireFeature feature="onlineExams">
               <RequireHierarchy roles={['subordinate']}>
-                <RequirePermission keys={[PERMISSIONS.ASSESSMENT_CREATE]}>
+                <RequirePermission keys={[PERMISSIONS.ONLINE_EXAM_CREATE]}>
                   <AssessmentResultsPage kind="online_exam" />
                 </RequirePermission>
               </RequireHierarchy>
@@ -333,7 +335,7 @@ export default function App() {
           path="my-online-exams"
           element={
             <RequireFeature feature="onlineExams">
-              <RequirePermission keys={[PERMISSIONS.ASSESSMENT_VIEW, PERMISSIONS.ASSESSMENT_SUBMIT]}>
+              <RequirePermission keys={[PERMISSIONS.ONLINE_EXAM_VIEW, PERMISSIONS.ONLINE_EXAM_SUBMIT]}>
                 <MyAssessmentsPage kind="online_exam" />
               </RequirePermission>
             </RequireFeature>
@@ -343,7 +345,7 @@ export default function App() {
           path="my-online-exams/:assignmentId"
           element={
             <RequireFeature feature="onlineExams">
-              <RequirePermission keys={[PERMISSIONS.ASSESSMENT_VIEW, PERMISSIONS.ASSESSMENT_SUBMIT]}>
+              <RequirePermission keys={[PERMISSIONS.ONLINE_EXAM_VIEW, PERMISSIONS.ONLINE_EXAM_SUBMIT]}>
                 <TakeAssessmentPage kind="online_exam" />
               </RequirePermission>
             </RequireFeature>

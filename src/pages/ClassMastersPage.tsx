@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/Card';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -42,6 +42,20 @@ function MasterFormModal({
   const [nextClassMasterId, setNextClassMasterId] = useState(initial?.nextClassMasterId || '');
   const [sortOrder, setSortOrder] = useState(String(initial?.sortOrder ?? 0));
 
+  useEffect(() => {
+    if (!open) {
+      setName('');
+      setDescription('');
+      setNextClassMasterId('');
+      setSortOrder('0');
+      return;
+    }
+    setName(initial?.name || '');
+    setDescription(initial?.description || '');
+    setNextClassMasterId(initial?.nextClassMasterId || '');
+    setSortOrder(String(initial?.sortOrder ?? 0));
+  }, [open, initial]);
+
   const nextOptions = useMemo(
     () => masters.filter((m) => m.id !== initial?.id),
     [masters, initial?.id]
@@ -63,12 +77,15 @@ function MasterFormModal({
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={() => {
+        if (saving) return;
+        onClose();
+      }}
       title={initial ? 'Edit class master' : 'New class master'}
       description="Stable grade names reused each year."
       footer={
         <>
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
           <Button type="submit" form="master-form" disabled={!canSave || saving}>

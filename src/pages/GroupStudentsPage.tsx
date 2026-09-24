@@ -106,12 +106,15 @@ function GroupFormModal({
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={() => {
+        if (saving) return;
+        onClose();
+      }}
       size="lg"
       title={initial ? 'Edit group' : 'Create student group'}
       footer={
         <>
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
           <Button type="submit" form="student-group-form" disabled={!canSave || saving}>

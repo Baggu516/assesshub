@@ -80,12 +80,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const cached = getCachedUser(subdomain);
-      if (cached) {
-        if (!cancelled) {
-          setUser(cached);
-          setLoading(false);
-        }
-        return;
+      if (cached && !cancelled) {
+        setUser(cached);
+        setLoading(false);
       }
 
       try {
@@ -95,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setCachedUser(subdomain, data.user);
         }
       } catch {
-        if (!cancelled) {
+        if (!cancelled && !cached) {
           clearSessionCache(subdomain);
           clearTokens();
           setUser(null);

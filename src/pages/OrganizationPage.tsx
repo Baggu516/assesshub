@@ -85,6 +85,11 @@ export function OrganizationPage() {
                   {data.subdomain}
                 </div>
               </FormField>
+              <FormField label="Database" hint="MongoDB database for this tenant.">
+                <div className="rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900/50 px-3 py-2.5 text-sm font-mono">
+                  {data.dbName || '—'}
+                </div>
+              </FormField>
               <FormField
                 label="Registry status"
                 hint="Suspended tenants cannot sign in. Managed from platform admin."

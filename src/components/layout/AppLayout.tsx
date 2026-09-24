@@ -13,8 +13,8 @@ import { AiChatWidget } from '@/components/dashboard/AiChatWidget';
 
 const SIDEBAR_KEY = 'ah_sidebar_collapsed';
 
-function can(p: string[], k: (typeof PERMISSIONS)[keyof typeof PERMISSIONS]) {
-  return p.includes(k);
+function can(p: string[] | undefined, k: (typeof PERMISSIONS)[keyof typeof PERMISSIONS]) {
+  return Boolean(p?.includes(k));
 }
 
 function NavIcon({ to }: { to: string }) {
@@ -248,27 +248,39 @@ export function AppLayout() {
       {
         to: '/worksheets',
         label: 'Worksheets',
-        show: features.worksheets && (teaches || isStudent),
+        show:
+          features.worksheets &&
+          !!user &&
+          (can(user.permissions, PERMISSIONS.WORKSHEET_VIEW) ||
+            can(user.permissions, PERMISSIONS.WORKSHEET_MANAGE)),
       },
       {
         to: '/assessments',
         label: resolveNavLabel('/assessments', user?.hierarchyRole, sidebarLabels),
-        show: features.assessments && teaches,
+        show: features.assessments && teaches && can(user?.permissions, PERMISSIONS.ASSESSMENT_CREATE),
       },
       {
         to: '/my-assessments',
         label: resolveNavLabel('/my-assessments', user?.hierarchyRole, sidebarLabels),
-        show: features.assessments && isStudent,
+        show:
+          features.assessments &&
+          isStudent &&
+          (can(user?.permissions, PERMISSIONS.ASSESSMENT_VIEW) ||
+            can(user?.permissions, PERMISSIONS.ASSESSMENT_SUBMIT)),
       },
       {
         to: '/online-exams',
         label: 'Online exams',
-        show: features.onlineExams && teaches,
+        show: features.onlineExams && teaches && can(user?.permissions, PERMISSIONS.ONLINE_EXAM_CREATE),
       },
       {
         to: '/my-online-exams',
         label: 'Online exams',
-        show: features.onlineExams && isStudent,
+        show:
+          features.onlineExams &&
+          isStudent &&
+          (can(user?.permissions, PERMISSIONS.ONLINE_EXAM_VIEW) ||
+            can(user?.permissions, PERMISSIONS.ONLINE_EXAM_SUBMIT)),
       },
       { to: '/profile', label: resolveNavLabel('/profile', user?.hierarchyRole, sidebarLabels), show: true },
       {

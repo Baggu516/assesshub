@@ -71,12 +71,15 @@ function CreateUserModal({
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={() => {
+        if (mutation.isPending) return;
+        onClose();
+      }}
       title="Add platform user"
       description="Console access for /platform."
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose} disabled={mutation.isPending}>
             Cancel
           </Button>
           <Button type="submit" form="create-user-form" disabled={mutation.isPending}>
@@ -164,13 +167,19 @@ function EditUserModal({
   const [isActive, setIsActive] = useState(true);
 
   useEffect(() => {
-    if (user && open) {
-      setEmail(user.email);
+    if (!open || !user) {
+      setEmail('');
       setPassword('');
-      setFirstName(user.firstName);
-      setLastName(user.lastName);
-      setIsActive(user.isActive);
+      setFirstName('');
+      setLastName('');
+      setIsActive(true);
+      return;
     }
+    setEmail(user.email);
+    setPassword('');
+    setFirstName(user.firstName);
+    setLastName(user.lastName);
+    setIsActive(user.isActive);
   }, [user, open]);
 
   const mutation = useMutation({
@@ -208,12 +217,15 @@ function EditUserModal({
   return (
     <Modal
       open={open && !!user}
-      onClose={onClose}
+      onClose={() => {
+        if (mutation.isPending) return;
+        onClose();
+      }}
       title="Edit platform user"
       description="Leave password blank to keep current."
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose} disabled={mutation.isPending}>
             Cancel
           </Button>
           <Button type="submit" form="edit-user-form" disabled={mutation.isPending}>

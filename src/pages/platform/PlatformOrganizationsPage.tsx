@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import { platformApi } from '@/lib/platformApi';
@@ -25,6 +25,7 @@ type PlatformOrg = {
   id: string;
   name: string;
   subdomain: string;
+  dbName?: string | null;
   isActive: boolean;
   logoUrl?: string | null;
   tagline?: string | null;
@@ -159,6 +160,26 @@ function slugifySubdomain(value: string) {
     .replace(/^-|-$/g, '');
 }
 
+type UploadedLogo = { logoUrl: string; logoStoragePath: string };
+
+type OrgSaveBody = {
+  name: string;
+  isActive: boolean;
+  features: OrgFeatures;
+  tagline: string;
+  clearLogo?: boolean;
+  logoUrl?: string;
+  logoStoragePath?: string;
+};
+
+async function uploadClientLogo(file: File, subdomain: string) {
+  const fd = new FormData();
+  fd.append('logo', file);
+  if (subdomain) fd.append('subdomain', subdomain);
+  const { data } = await platformApi.post<UploadedLogo>('/platform/organizations/logo', fd);
+  return data;
+}
+
 function EditOrganizationModal({
   org,
   open,
@@ -169,16 +190,17 @@ function EditOrganizationModal({
   org: PlatformOrg | null;
   open: boolean;
   onClose: () => void;
-  onSave: (id: string, form: FormData) => void;
+  onSave: (id: string, body: OrgSaveBody) => Promise<unknown>;
   isPending: boolean;
 }) {
   const [name, setName] = useState('');
   const [tagline, setTagline] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [features, setFeatures] = useState<OrgFeatures>(defaultFeatures);
-  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [uploadedLogo, setUploadedLogo] = useState<UploadedLogo | null>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
   const [clearLogo, setClearLogo] = useState(false);
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoInputKey, setLogoInputKey] = useState(0);
 
   const { data: detail, isLoading: pocLoading } = useQuery({
     queryKey: ['platform-organization', org?.id],
@@ -192,42 +214,58 @@ function EditOrganizationModal({
   });
 
   const poc = detail?.poc;
-  const currentLogo = clearLogo ? null : logoPreview || detail?.logoUrl || org?.logoUrl || null;
+  const currentLogo = clearLogo ? null : uploadedLogo?.logoUrl || detail?.logoUrl || org?.logoUrl || null;
+  const busy = isPending || logoUploading;
+  const seededFor = useRef<string | null>(null);
 
-  useEffect(() => {
-    if (org) {
-      setName(org.name);
-      setTagline(org.tagline || detail?.tagline || '');
-      setIsActive(org.isActive);
-      setFeatures(resolveFeatures(detail || org));
-      setLogoFile(null);
-      setClearLogo(false);
-      setLogoPreview(null);
-    }
-  }, [org, open, detail]);
-
-  useEffect(() => {
-    if (!logoFile) return;
-    const url = URL.createObjectURL(logoFile);
-    setLogoPreview(url);
+  const resetFields = () => {
+    setName('');
+    setTagline('');
+    setIsActive(true);
+    setFeatures(defaultFeatures);
+    setUploadedLogo(null);
+    setLogoUploading(false);
     setClearLogo(false);
-    return () => URL.revokeObjectURL(url);
-  }, [logoFile]);
+    setLogoInputKey((key) => key + 1);
+  };
+
+  useEffect(() => {
+    if (!open || !org) {
+      seededFor.current = null;
+      resetFields();
+      return;
+    }
+    const fromDetail = detail?.id === org.id;
+    const seedKey = fromDetail ? `${org.id}:detail` : org.id;
+    if (seededFor.current === seedKey || seededFor.current === `${org.id}:detail`) return;
+    seededFor.current = seedKey;
+    const source = fromDetail ? detail : org;
+    setName(source.name);
+    setTagline(source.tagline || '');
+    setIsActive(source.isActive);
+    setFeatures(resolveFeatures(source));
+    setUploadedLogo(null);
+    setClearLogo(false);
+    setLogoInputKey((key) => key + 1);
+  }, [open, org, detail]);
 
   return (
     <Modal
       open={open && !!org}
-      onClose={onClose}
+      onClose={() => {
+        if (busy) return;
+        onClose();
+      }}
       size="lg"
       title="Edit client"
       description="Rename, update branding, change plan, or suspend. Subdomain stays locked."
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>
             Cancel
           </Button>
-          <Button type="submit" form="edit-org-form" disabled={isPending}>
-            {isPending ? 'Saving…' : 'Save'}
+          <Button type="submit" form="edit-org-form" disabled={busy}>
+            {logoUploading ? 'Uploading image…' : isPending ? 'Saving…' : 'Save'}
           </Button>
         </>
       }
@@ -236,25 +274,41 @@ function EditOrganizationModal({
         <form
           id="edit-org-form"
           className="space-y-3"
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
+            if (busy) return;
             const nextName = name.trim();
             if (!nextName) return;
-            const fd = new FormData();
-            fd.append('name', nextName);
-            fd.append('isActive', String(isActive));
-            fd.append('features', JSON.stringify(features));
-            fd.append('tagline', tagline.trim());
-            if (clearLogo) fd.append('clearLogo', 'true');
-            if (logoFile) fd.append('logo', logoFile);
-            onSave(org.id, fd);
-            onClose();
+            const body: OrgSaveBody = {
+              name: nextName,
+              isActive,
+              features,
+              tagline: tagline.trim(),
+            };
+            if (uploadedLogo) {
+              body.logoUrl = uploadedLogo.logoUrl;
+              body.logoStoragePath = uploadedLogo.logoStoragePath;
+            } else if (clearLogo) {
+              body.clearLogo = true;
+            }
+            try {
+              await onSave(org.id, body);
+              onClose();
+            } catch {
+              /* error toast is shown by the save mutation */
+            }
           }}
         >
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <p className="ah-label">Subdomain</p>
               <p className="mt-1 text-sm text-slate-800 dark:text-slate-100">{org.subdomain}</p>
+            </div>
+            <div>
+              <p className="ah-label">Database</p>
+              <p className="mt-1 font-mono text-sm text-slate-800 dark:text-slate-100">
+                {org.dbName || '—'}
+              </p>
             </div>
             <div>
               <label htmlFor="edit-org-name" className="ah-label">
@@ -296,19 +350,57 @@ function EditOrganizationModal({
               </div>
               <div className="min-w-0 flex-1 space-y-2">
                 <Input
+                  key={logoInputKey}
                   type="file"
                   accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
                   className="text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-brand-700"
-                  onChange={(e) => setLogoFile(e.target.files?.[0] || null)}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0] || null;
+                    if (!file) return;
+                    if (file.size > 1024 * 1024) {
+                      toast.error('Image must be 1MB or smaller');
+                      e.target.value = '';
+                      return;
+                    }
+                    setLogoUploading(true);
+                    try {
+                      const uploaded = await uploadClientLogo(file, org.subdomain);
+                      setUploadedLogo(uploaded);
+                      setClearLogo(false);
+                    } catch (err: unknown) {
+                      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+                      toast.error(msg || 'Could not upload image');
+                      setLogoInputKey((key) => key + 1);
+                    } finally {
+                      setLogoUploading(false);
+                    }
+                  }}
                 />
-                {(org.logoUrl || detail?.logoUrl) && !clearLogo ? (
+                {uploadedLogo ? (
+                  <button
+                    type="button"
+                    className="text-xs font-semibold text-rose-600 hover:underline"
+                    onClick={() => {
+                      setUploadedLogo(null);
+                      setLogoInputKey((key) => key + 1);
+                    }}
+                  >
+                    Clear image
+                  </button>
+                ) : null}
+                <p className="text-[11px] text-slate-400">
+                  {logoUploading
+                    ? 'Uploading to Supabase…'
+                    : 'Max 1MB. Uploaded first; Save sends the image URL with the other fields.'}
+                </p>
+                {(org.logoUrl || detail?.logoUrl) && !clearLogo && !uploadedLogo ? (
                   <button
                     type="button"
                     className="text-xs font-medium text-rose-600 hover:underline"
                     onClick={() => {
                       setClearLogo(true);
-                      setLogoFile(null);
-                      setLogoPreview(null);
+                      setUploadedLogo(null);
+                      setLogoInputKey((key) => key + 1);
                     }}
                   >
                     Remove logo
@@ -359,46 +451,42 @@ function CreateOrganizationModal({
 }) {
   const qc = useQueryClient();
   const [form, setForm] = useState(emptyCreateForm);
-  const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [uploadedLogo, setUploadedLogo] = useState<UploadedLogo | null>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoInputKey, setLogoInputKey] = useState(0);
   const [subdomainTouched, setSubdomainTouched] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setForm(emptyCreateForm);
-      setLogoFile(null);
-      setLogoPreview(null);
+      setUploadedLogo(null);
+      setLogoUploading(false);
+      setLogoInputKey((key) => key + 1);
       setSubdomainTouched(false);
     }
   }, [open]);
 
-  useEffect(() => {
-    if (!logoFile) {
-      setLogoPreview(null);
-      return;
-    }
-    const url = URL.createObjectURL(logoFile);
-    setLogoPreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [logoFile]);
-
   const createMutation = useMutation({
     mutationFn: async () => {
-      const fd = new FormData();
-      fd.append('name', form.name.trim());
-      fd.append('subdomain', form.subdomain.trim().toLowerCase().replace(/[^a-z0-9-]/g, ''));
-      fd.append('isActive', String(form.isActive));
-      fd.append('features', JSON.stringify(form.features));
-      if (form.tagline.trim()) fd.append('tagline', form.tagline.trim());
+      const body: Record<string, unknown> = {
+        name: form.name.trim(),
+        subdomain: form.subdomain.trim().toLowerCase().replace(/[^a-z0-9-]/g, ''),
+        isActive: form.isActive,
+        features: form.features,
+      };
+      if (form.tagline.trim()) body.tagline = form.tagline.trim();
       if (form.adminEmail.trim() && form.adminPassword) {
-        fd.append('adminEmail', form.adminEmail.trim().toLowerCase());
-        fd.append('adminPassword', form.adminPassword);
-        if (form.firstName.trim()) fd.append('firstName', form.firstName.trim());
-        if (form.lastName.trim()) fd.append('lastName', form.lastName.trim());
+        body.adminEmail = form.adminEmail.trim().toLowerCase();
+        body.adminPassword = form.adminPassword;
+        if (form.firstName.trim()) body.firstName = form.firstName.trim();
+        if (form.lastName.trim()) body.lastName = form.lastName.trim();
       }
-      if (logoFile) fd.append('logo', logoFile);
+      if (uploadedLogo) {
+        body.logoUrl = uploadedLogo.logoUrl;
+        body.logoStoragePath = uploadedLogo.logoStoragePath;
+      }
 
-      const { data } = await platformApi.post<CreateOrgResponse>('/platform/organizations', fd);
+      const { data } = await platformApi.post<CreateOrgResponse>('/platform/organizations', body);
       return data;
     },
     onSuccess: (data) => {
@@ -411,7 +499,9 @@ function CreateOrganizationModal({
           : 'Client created'
       );
       setForm(emptyCreateForm);
-      setLogoFile(null);
+      setUploadedLogo(null);
+      setLogoInputKey((key) => key + 1);
+      setSubdomainTouched(false);
       onClose();
     },
     onError: (err: unknown) => {
@@ -434,17 +524,20 @@ function CreateOrganizationModal({
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={() => {
+        if (createMutation.isPending || logoUploading) return;
+        onClose();
+      }}
       size="lg"
       title="Create client"
       description="Add a school/client. Upload their logo for the login page."
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose} disabled={createMutation.isPending || logoUploading}>
             Cancel
           </Button>
-          <Button type="submit" form="create-org-form" disabled={createMutation.isPending}>
-            {createMutation.isPending ? 'Creating…' : 'Create'}
+          <Button type="submit" form="create-org-form" disabled={createMutation.isPending || logoUploading}>
+            {logoUploading ? 'Uploading image…' : createMutation.isPending ? 'Creating…' : 'Create'}
           </Button>
         </>
       }
@@ -455,6 +548,7 @@ function CreateOrganizationModal({
         autoComplete="off"
         onSubmit={(e) => {
           e.preventDefault();
+          if (createMutation.isPending || logoUploading) return;
           createMutation.mutate();
         }}
       >
@@ -493,6 +587,9 @@ function CreateOrganizationModal({
               autoComplete="off"
               spellCheck={false}
             />
+            <p className="mt-1 text-xs text-slate-500">
+              Database name: {form.subdomain || '—'}
+            </p>
           </div>
         </div>
 
@@ -516,21 +613,61 @@ function CreateOrganizationModal({
           </label>
           <div className="mt-1 flex items-center gap-3">
             <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900">
-              {logoPreview ? (
-                <img src={logoPreview} alt="" className="h-full w-full object-contain p-1" />
+              {uploadedLogo ? (
+                <img src={uploadedLogo.logoUrl} alt="" className="h-full w-full object-contain p-1" />
               ) : (
                 <span className="text-[10px] font-medium text-slate-400">Logo</span>
               )}
             </div>
-            <Input
-              id="create-org-logo"
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
-              className="text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-brand-700"
-              onChange={(e) => setLogoFile(e.target.files?.[0] || null)}
-            />
+            <div className="min-w-0 flex-1 space-y-2">
+              <Input
+                key={logoInputKey}
+                id="create-org-logo"
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                className="text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-brand-700"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0] || null;
+                  if (!file) return;
+                  if (file.size > 1024 * 1024) {
+                    toast.error('Image must be 1MB or smaller');
+                    e.target.value = '';
+                    return;
+                  }
+                  const subdomain = form.subdomain.trim().toLowerCase();
+                  if (subdomain.length < 2) {
+                    toast.error('Enter a subdomain before choosing a logo');
+                    e.target.value = '';
+                    return;
+                  }
+                  setLogoUploading(true);
+                  try {
+                    const uploaded = await uploadClientLogo(file, subdomain);
+                    setUploadedLogo(uploaded);
+                  } catch (err: unknown) {
+                    const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+                    toast.error(msg || 'Could not upload image');
+                    setLogoInputKey((key) => key + 1);
+                  } finally {
+                    setLogoUploading(false);
+                  }
+                }}
+              />
+              {uploadedLogo ? (
+                <button
+                  type="button"
+                  className="text-xs font-medium text-rose-600 hover:underline"
+                  onClick={() => {
+                    setUploadedLogo(null);
+                    setLogoInputKey((key) => key + 1);
+                  }}
+                >
+                  Clear image
+                </button>
+              ) : null}
+            </div>
           </div>
-          <p className="mt-1 text-[11px] text-slate-400">PNG, JPEG, WebP, GIF, or SVG · max 2MB · stored in Supabase</p>
+          <p className="mt-1 text-[11px] text-slate-400">PNG, JPEG, WebP, GIF, or SVG · max 1MB · stored in Supabase</p>
         </div>
 
         <div className="flex items-center justify-between gap-3">
@@ -626,10 +763,10 @@ export function PlatformOrganizationsPage() {
   });
 
   const patchMutation = useMutation({
-    mutationFn: async ({ id, form }: { id: string; form: FormData }) => {
+    mutationFn: async ({ id, body }: { id: string; body: OrgSaveBody }) => {
       const { data: res } = await platformApi.patch<{ organization: PlatformOrg }>(
         `/platform/organizations/${id}`,
-        form
+        body
       );
       return res.organization;
     },
@@ -642,9 +779,7 @@ export function PlatformOrganizationsPage() {
     onError: () => toast.error('Update failed'),
   });
 
-  const saveOrg = (id: string, form: FormData) => {
-    patchMutation.mutate({ id, form });
-  };
+  const saveOrg = (id: string, body: OrgSaveBody) => patchMutation.mutateAsync({ id, body });
 
   const filtered = useMemo(() => {
     const list = data ?? [];
@@ -653,7 +788,11 @@ export function PlatformOrganizationsPage() {
       if (statusFilter === 'active' && !org.isActive) return false;
       if (statusFilter === 'suspended' && org.isActive) return false;
       if (!q) return true;
-      return org.name.toLowerCase().includes(q) || org.subdomain.toLowerCase().includes(q);
+      return (
+        org.name.toLowerCase().includes(q) ||
+        org.subdomain.toLowerCase().includes(q) ||
+        (org.dbName || '').toLowerCase().includes(q)
+      );
     });
   }, [data, query, statusFilter]);
 
@@ -816,6 +955,7 @@ export function PlatformOrganizationsPage() {
                 <tr>
                   <th>Client</th>
                   <th>Subdomain</th>
+                  <th>Database</th>
                   <th>Subscription</th>
                   <th>Status</th>
                   <th>Created</th>
@@ -851,6 +991,11 @@ export function PlatformOrganizationsPage() {
                     <td>
                       <code className="rounded-lg bg-slate-100 px-2 py-1 font-mono text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                         {org.subdomain}
+                      </code>
+                    </td>
+                    <td>
+                      <code className="rounded-lg bg-slate-100 px-2 py-1 font-mono text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                        {org.dbName || '—'}
                       </code>
                     </td>
                     <td>

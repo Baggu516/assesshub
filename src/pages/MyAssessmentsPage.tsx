@@ -40,6 +40,24 @@ export function MyAssessmentsPage({ kind = 'assessment' }: { kind?: ExamKind }) 
   const queryYear = yearId || undefined;
   const { data, isLoading } = useMyAssignmentsQuery(queryYear, kind);
   const assignments = data?.assignments ?? [];
+  const [now, setNow] = useState(() => Date.now());
+
+  const nextStart = useMemo(() => {
+    let soonest: number | null = null;
+    for (const a of assignments) {
+      if (a.status !== 'pending' || a.startedAt || !a.startAt) continue;
+      const starts = new Date(a.startAt).getTime();
+      if (Number.isNaN(starts) || starts <= now) continue;
+      if (soonest == null || starts < soonest) soonest = starts;
+    }
+    return soonest;
+  }, [assignments, now]);
+
+  useEffect(() => {
+    if (nextStart == null) return undefined;
+    const id = window.setTimeout(() => setNow(Date.now()), Math.max(250, nextStart - Date.now()));
+    return () => window.clearTimeout(id);
+  }, [nextStart]);
 
   return (
     <div className="space-y-6">
@@ -140,11 +158,17 @@ export function MyAssessmentsPage({ kind = 'assessment' }: { kind?: ExamKind }) 
                 </p>
 
                 <div className="mt-auto flex flex-wrap gap-2 pt-4">
-                  <Link to={`${mine}/${a.id}`}>
-                    <Button size="sm" variant={pending ? 'primary' : 'secondary'}>
-                      {pending ? 'Start' : a.resultsVisible ? 'View results' : 'View submission'}
+                  {pending && !a.startedAt && a.startAt && new Date(a.startAt).getTime() > now ? (
+                    <Button size="sm" disabled title={startLabel ? `Starts ${startLabel}` : undefined}>
+                      Not yet started
                     </Button>
-                  </Link>
+                  ) : (
+                    <Link to={`${mine}/${a.id}`}>
+                      <Button size="sm" variant={pending ? 'primary' : 'secondary'}>
+                        {pending ? 'Start' : a.resultsVisible ? 'View results' : 'View submission'}
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               </Card>
             );
