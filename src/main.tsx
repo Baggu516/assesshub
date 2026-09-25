@@ -6,6 +6,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import App from './App';
 import { AuthProvider } from './context/AuthContext';
+import { AcademicYearProvider } from './context/AcademicYearContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { TenantProvider } from './context/TenantContext';
 import './index.css';
@@ -17,8 +18,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <BrowserRouter>
           <TenantProvider>
             <AuthProvider>
-              <App />
-              <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
+              <AcademicYearProvider>
+                <App />
+                <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
+              </AcademicYearProvider>
             </AuthProvider>
           </TenantProvider>
         </BrowserRouter>

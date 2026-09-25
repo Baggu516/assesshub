@@ -10,6 +10,7 @@ import { resolveNavLabel } from '@/lib/sidebarLabels';
 import { resolveOrgFeatures } from '@/lib/sessionCache';
 import { ClassTrioMark } from '@/components/brand/ClassTrioMark';
 import { AiChatWidget } from '@/components/dashboard/AiChatWidget';
+import { AcademicYearSwitcher } from '@/components/layout/AcademicYearSwitcher';
 
 const SIDEBAR_KEY = 'ah_sidebar_collapsed';
 
@@ -405,6 +406,7 @@ export function AppLayout() {
             ))}
         </nav>
         <div className="shrink-0 border-t border-slate-200 dark:border-slate-800 p-2 space-y-1">
+          <AcademicYearSwitcher collapsed={collapsed} />
           {!collapsed ? (
             <div className="px-3 py-1 text-xs text-slate-500 truncate" title={user?.email}>
               {user?.email}
@@ -493,6 +495,7 @@ export function AppLayout() {
             ))}
           </nav>
           <div className="shrink-0 border-t border-slate-200 dark:border-slate-800 p-3 space-y-2">
+            <AcademicYearSwitcher />
             <p className="text-xs text-slate-500 truncate px-1" title={user?.email}>
               {user?.email}
             </p>

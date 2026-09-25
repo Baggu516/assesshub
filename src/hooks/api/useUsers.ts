@@ -51,16 +51,24 @@ export function useSubordinatesQuery(enabled = true, viewerUserId?: string) {
 export function useUsersQuery(
   search: string,
   viewerUserId: string | undefined,
-  opts?: { limit?: number }
+  opts?: { page?: number; limit?: number }
 ) {
+  const page = opts?.page;
   const limit = opts?.limit;
   return useQuery({
-    queryKey: ['users', search, viewerUserId, limit],
+    queryKey: ['users', search, viewerUserId, page ?? null, limit ?? null],
     enabled: Boolean(viewerUserId),
     queryFn: async () => {
-      const { data } = await api.get<{ users: UserListRow[]; total: number }>('/users', {
-        params: { search, ...(limit ? { limit } : {}) },
-      });
+      const { data } = await api.get<{ users: UserListRow[]; total: number; page: number; limit: number }>(
+        '/users',
+        {
+          params: {
+            search,
+            ...(page ? { page } : {}),
+            ...(limit ? { limit } : {}),
+          },
+        }
+      );
       return data;
     },
   });

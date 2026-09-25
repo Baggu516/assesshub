@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PasswordInput } from '@/components/ui/PasswordInput';
+import { Select } from '@/components/ui/Select';
 import { PERMISSIONS } from '@/constants/permissions';
 import { formatPermissionList, permissionVisibleFor } from '@/constants/permissionLabels';
 import { resolveOrgFeatures } from '@/lib/sessionCache';
@@ -23,12 +24,24 @@ import {
 } from '@/hooks/api/useUsers';
 import { isValidEmail } from '@/lib/validation';
 
+const PAGE_SIZES = [5, 10, 15, 20] as const;
+
 type MemberForm = {
   email: string;
   password: string;
   firstName: string;
   lastName: string;
 };
+
+function pageWindow(current: number, count: number) {
+  const size = 5;
+  let start = Math.max(1, current - Math.floor(size / 2));
+  const end = Math.min(count, start + size - 1);
+  start = Math.max(1, end - size + 1);
+  const pages: number[] = [];
+  for (let i = start; i <= end; i += 1) pages.push(i);
+  return pages;
+}
 
 function AddTeamMemberModal({
   open,
@@ -284,9 +297,15 @@ export function UsersPage() {
   const features = resolveOrgFeatures(org);
   const [search, setSearch] = useState('');
   const [classTab, setClassTab] = useState<string>('all');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(10);
   const isAdmin = user?.hierarchyRole === 'admin';
   const isTeacher = user?.hierarchyRole === 'subordinate';
-  const { data, isLoading } = useUsersQuery(search, user?.id, isTeacher ? { limit: 100 } : undefined);
+  const { data, isLoading } = useUsersQuery(
+    search,
+    user?.id,
+    isTeacher ? { limit: 100 } : { page, limit: pageSize }
+  );
   const { data: catalog, isLoading: catalogLoading } = usePermissionsCatalogQuery();
   const { createMember, invite, updateUser } = useUserMutations();
 
@@ -352,6 +371,19 @@ export function UsersPage() {
     if (!isTeacher || classTab === 'all') return memberRows;
     return memberRows.filter((u) => (u.classes || []).some((c) => c.id === classTab));
   }, [isTeacher, classTab, memberRows]);
+
+  const listTotal = isTeacher ? visibleRows.length : (data?.total ?? visibleRows.length);
+  const pageCount = Math.max(1, Math.ceil(listTotal / pageSize) || 1);
+  const currentPage = Math.min(page, pageCount);
+  const pagedRows = isTeacher
+    ? visibleRows.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+    : visibleRows;
+  const rangeFrom = listTotal === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const rangeTo = Math.min(currentPage * pageSize, listTotal);
+
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount);
+  }, [page, pageCount]);
 
   const pageTitle = isAdmin ? 'Students' : 'My students';
   const pageDescription = isTeacher
@@ -492,7 +524,10 @@ export function UsersPage() {
           <div className="flex gap-1 overflow-x-auto border-b border-slate-200/80 px-3 pt-3 dark:border-slate-700/80 sm:px-4">
             <button
               type="button"
-              onClick={() => setClassTab('all')}
+              onClick={() => {
+                setClassTab('all');
+                setPage(1);
+              }}
               className={clsx(
                 'shrink-0 rounded-t-lg px-3.5 py-2 text-sm font-medium transition-colors',
                 classTab === 'all'
@@ -507,7 +542,10 @@ export function UsersPage() {
               <button
                 key={c.id}
                 type="button"
-                onClick={() => setClassTab(c.id)}
+                onClick={() => {
+                  setClassTab(c.id);
+                  setPage(1);
+                }}
                 className={clsx(
                   'shrink-0 rounded-t-lg px-3.5 py-2 text-sm font-medium transition-colors',
                   classTab === c.id
@@ -539,7 +577,10 @@ export function UsersPage() {
             </svg>
             <Input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
               placeholder={isTeacher ? 'Search by name, email, or class…' : 'Search by email or name…'}
               className="pl-10"
               inputSize="sm"
@@ -591,6 +632,7 @@ export function UsersPage() {
                   onClick={() => {
                     setSearch('');
                     setClassTab('all');
+                    setPage(1);
                   }}
                 >
                   Clear filters
@@ -610,7 +652,7 @@ export function UsersPage() {
                 </tr>
               </thead>
               <tbody>
-                {visibleRows.map((u: UserListRow) => {
+                {pagedRows.map((u: UserListRow) => {
                   const name = [u.firstName, u.lastName].filter(Boolean).join(' ');
                   const initials = name
                     ? name
@@ -692,6 +734,73 @@ export function UsersPage() {
             </table>
           )}
         </div>
+
+        {!isLoading && visibleRows.length > 0 && (
+          <div className="flex flex-col gap-3 border-t border-slate-200/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 dark:border-slate-700/80">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Showing{' '}
+              <span className="font-medium tabular-nums text-slate-700 dark:text-slate-200">
+                {rangeFrom}–{rangeTo}
+              </span>{' '}
+              of <span className="font-medium tabular-nums text-slate-700 dark:text-slate-200">{listTotal}</span>
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                Per page
+                <Select
+                  inputSize="sm"
+                  className="w-[4.5rem]"
+                  aria-label="Rows per page"
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setPage(1);
+                  }}
+                >
+                  {PAGE_SIZES.map((size) => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+              <nav className="flex items-center gap-1" aria-label="Pagination">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={currentPage <= 1}
+                  onClick={() => setPage(currentPage - 1)}
+                >
+                  Previous
+                </Button>
+                {pageWindow(currentPage, pageCount).map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setPage(n)}
+                    aria-current={n === currentPage ? 'page' : undefined}
+                    className={clsx(
+                      'h-8 min-w-8 rounded-lg px-2 text-xs font-medium tabular-nums transition-colors',
+                      n === currentPage
+                        ? 'bg-brand-600 text-white'
+                        : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                    )}
+                  >
+                    {n}
+                  </button>
+                ))}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={currentPage >= pageCount}
+                  onClick={() => setPage(currentPage + 1)}
+                >
+                  Next
+                </Button>
+              </nav>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

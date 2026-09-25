@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/Card';
@@ -6,20 +6,16 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Spinner';
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import { useClassesQuery, useClassMutations, type SchoolClass } from '@/hooks/api/useClasses';
-import { useAcademicYearsQuery } from '@/hooks/api/useAcademicYears';
 
 export function ClassesPage() {
   const navigate = useNavigate();
-  const { data: years = [] } = useAcademicYearsQuery();
-  const currentYear = useMemo(
-    () => years.find((y) => y.isCurrent) || years[0] || null,
-    [years]
-  );
-  const [yearFilter, setYearFilter] = useState<string>('');
-  const effectiveYearId = yearFilter === 'all' ? null : yearFilter || currentYear?.id || null;
+  const { years, yearId, isLoading: yearsLoading } = useAcademicYear();
+  const ready = !yearsLoading && Boolean(yearId);
+  const effectiveYearId = yearId === 'all' ? null : yearId || null;
 
-  const { data: classes = [], isLoading } = useClassesQuery(true, effectiveYearId);
+  const { data: classes = [], isLoading } = useClassesQuery(ready, effectiveYearId);
   const { remove } = useClassMutations();
 
   const sorted = useMemo(
@@ -62,28 +58,7 @@ export function ClassesPage() {
           Create an academic year first under <span className="font-medium">Academic years</span>, then
           add class masters, then open classes here.
         </Card>
-      ) : (
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2 text-xs text-slate-500">
-            Year
-            <select
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
-              value={yearFilter === 'all' ? 'all' : effectiveYearId || ''}
-              onChange={(e) => setYearFilter(e.target.value)}
-            >
-              <option value="all">All years</option>
-              {years.map((y) => (
-                <option key={y.id} value={y.id}>
-                  {y.label}
-                  {y.isCurrent ? ' (current)' : ''}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      )}
-
-      {isLoading ? (
+      ) : isLoading || !ready ? (
         <div className="space-y-3">
           <Skeleton className="h-20" />
           <Skeleton className="h-20" />

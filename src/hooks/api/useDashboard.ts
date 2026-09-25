@@ -33,13 +33,15 @@ export type StudentDashboard = {
   pendingAssessments: number;
   submittedAssessments: number;
   averageScorePercent: number;
+  className: string | null;
 };
 
 export type DashboardData = OrgDashboard | TeacherDashboard | StudentDashboard;
 
-export function useDashboardQuery(academicYearId?: string) {
+export function useDashboardQuery(academicYearId?: string, enabled = true) {
   return useQuery({
     queryKey: ['dashboard', academicYearId ?? 'current'],
+    enabled,
     queryFn: async () => {
       const { data } = await api.get<DashboardData>('/reports/dashboard', {
         params: academicYearId ? { academicYearId } : undefined,

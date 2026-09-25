@@ -1,11 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Badge, Button, Card, EmptyState, PageHeader, Skeleton } from '@/components/ui';
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import { useMyAssignmentsQuery, type ExamKind } from '@/hooks/api/useAssessments';
-import { useAcademicYearsQuery } from '@/hooks/api/useAcademicYears';
-
-const selectClass =
-  'rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-900';
 
 function formatDateTime(iso: string | null | undefined) {
   if (!iso) return null;
@@ -23,20 +20,7 @@ function formatDateTime(iso: string | null | undefined) {
 export function MyAssessmentsPage({ kind = 'assessment' }: { kind?: ExamKind }) {
   const online = kind === 'online_exam';
   const mine = online ? '/my-online-exams' : '/my-assessments';
-  const { data: years = [], isLoading: yearsLoading } = useAcademicYearsQuery();
-  const sortedYears = useMemo(
-    () => [...years].sort((a, b) => b.label.localeCompare(a.label)),
-    [years]
-  );
-
-  const [yearId, setYearId] = useState('');
-
-  useEffect(() => {
-    if (yearId || !sortedYears.length) return;
-    const current = sortedYears.find((y) => y.isCurrent) || sortedYears[0];
-    setYearId(current.id);
-  }, [sortedYears, yearId]);
-
+  const { yearId, sortedYears } = useAcademicYear();
   const queryYear = yearId || undefined;
   const { data, isLoading } = useMyAssignmentsQuery(queryYear, kind);
   const assignments = data?.assignments ?? [];
@@ -69,28 +53,6 @@ export function MyAssessmentsPage({ kind = 'assessment' }: { kind?: ExamKind }) 
             ? 'CBT exams open in fullscreen. Leaving fullscreen three times submits the exam. Results appear after your teacher announces them.'
             : 'Assessments you can attempt online. Results appear after your teacher announces them.'
         }
-        actions={
-          yearsLoading ? (
-            <Skeleton className="h-10 w-44" />
-          ) : sortedYears.length ? (
-            <label className="flex items-center gap-2 text-xs text-slate-500">
-              <span className="shrink-0">Academic year</span>
-              <select
-                className={selectClass}
-                value={yearId}
-                onChange={(e) => setYearId(e.target.value)}
-              >
-                {sortedYears.map((y) => (
-                  <option key={y.id} value={y.id}>
-                    {y.label}
-                    {y.isCurrent ? ' (current)' : ''}
-                  </option>
-                ))}
-                <option value="all">All years</option>
-              </select>
-            </label>
-          ) : null
-        }
       />
 
       {isLoading || (sortedYears.length > 0 && !yearId) ? (
@@ -108,8 +70,8 @@ export function MyAssessmentsPage({ kind = 'assessment' }: { kind?: ExamKind }) 
                   ? 'When your teacher assigns an online exam, it will show up here.'
                   : 'When your teacher assigns an assessment, it will show up here.'
                 : online
-                  ? 'No online exams for this academic year. Try another year or All years.'
-                  : 'No assessments for this academic year. Try another year or All years.'
+                  ? 'No online exams for this academic year. Change the year in the sidebar.'
+                  : 'No assessments for this academic year. Change the year in the sidebar.'
             }
           />
         </Card>
