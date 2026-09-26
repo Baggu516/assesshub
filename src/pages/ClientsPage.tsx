@@ -67,43 +67,71 @@ function PlanPicker({
   value: OrgFeatures;
   onChange: (features: OrgFeatures) => void;
 }) {
-  const rows: { key: keyof OrgFeatures; title: string }[] = [
-    { key: 'aiDashboard', title: 'AI chat on dashboard' },
-    { key: 'aiAssessmentCreate', title: 'AI for assessments and online exams' },
-    { key: 'worksheets', title: 'Worksheets' },
-    { key: 'assessments', title: 'Assessments' },
-    { key: 'onlineExams', title: 'Online exams' },
+  const groups: {
+    label: string;
+    rows: { key: keyof OrgFeatures; title: string; hint: string }[];
+  }[] = [
+    {
+      label: 'School tools',
+      rows: [
+        { key: 'worksheets', title: 'Worksheets', hint: 'Practice sheets for classes' },
+        { key: 'assessments', title: 'Assessments', hint: 'Tests, scores, and results' },
+        { key: 'onlineExams', title: 'Online exams', hint: 'Timed exams, with optional camera' },
+      ],
+    },
+    {
+      label: 'AI',
+      rows: [
+        { key: 'aiDashboard', title: 'AI chat on dashboard', hint: 'Assistant on the home screen' },
+        {
+          key: 'aiAssessmentCreate',
+          title: 'AI for assessments and online exams',
+          hint: 'Draft questions from a prompt',
+        },
+      ],
+    },
   ];
 
   return (
-    <div>
-      <p className="ah-label mb-1.5">Subscription</p>
-      <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
-        {rows.map((row, index) => {
-          const checked = value[row.key] === true;
-          return (
-            <div
-              key={row.key}
-              className={clsx(
-                'flex items-center justify-between gap-3 px-3 py-2',
-                index > 0 && 'border-t border-slate-100 dark:border-slate-800'
-              )}
-            >
-              <p className="text-sm text-slate-800 dark:text-slate-100">{row.title}</p>
-              <Toggle
-                checked={checked}
-                onChange={(next) =>
-                  onChange({
-                    ...value,
-                    [row.key]: next,
-                  })
-                }
-                aria-label={row.title}
-              />
-            </div>
-          );
-        })}
-      </div>
+    <div className="space-y-3">
+      <p className="ah-label">Subscription</p>
+      {groups.map((group) => (
+        <div
+          key={group.label}
+          className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700"
+        >
+          <p className="border-b border-slate-100 bg-slate-50 px-3.5 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:border-slate-800 dark:bg-slate-950/50">
+            {group.label}
+          </p>
+          {group.rows.map((row, index) => {
+            const checked = value[row.key] === true;
+            return (
+              <div
+                key={row.key}
+                className={clsx(
+                  'flex items-center justify-between gap-4 px-3.5 py-3',
+                  index > 0 && 'border-t border-slate-100 dark:border-slate-800'
+                )}
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{row.title}</p>
+                  <p className="mt-0.5 text-xs text-slate-400">{row.hint}</p>
+                </div>
+                <Toggle
+                  checked={checked}
+                  onChange={(next) =>
+                    onChange({
+                      ...value,
+                      [row.key]: next,
+                    })
+                  }
+                  aria-label={row.title}
+                />
+              </div>
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }
@@ -201,6 +229,7 @@ function EditOrganizationModal({
   const [logoUploading, setLogoUploading] = useState(false);
   const [clearLogo, setClearLogo] = useState(false);
   const [logoInputKey, setLogoInputKey] = useState(0);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   const { data: detail, isLoading: pocLoading } = useQuery({
     queryKey: ['platform-organization', org?.id],
@@ -258,9 +287,15 @@ function EditOrganizationModal({
       }}
       size="lg"
       title="Edit client"
-      description="Rename, update branding, change plan, or suspend. Subdomain stays locked."
+      description="Name, logo, and which parts of the product this school can use."
       footer={
         <>
+          <div className="mr-auto flex items-center gap-2.5">
+            <Toggle checked={isActive} onChange={setIsActive} disabled={busy} aria-label="Active" />
+            <span className="text-sm text-slate-600 dark:text-slate-300">
+              {isActive ? 'Active' : 'Suspended'}
+            </span>
+          </div>
           <Button variant="ghost" onClick={onClose} disabled={busy}>
             Cancel
           </Button>
@@ -273,7 +308,7 @@ function EditOrganizationModal({
       {org && (
         <form
           id="edit-org-form"
-          className="space-y-3"
+          className="space-y-5"
           onSubmit={async (e) => {
             e.preventDefault();
             if (busy) return;
@@ -299,143 +334,148 @@ function EditOrganizationModal({
             }
           }}
         >
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <p className="ah-label">Subdomain</p>
-              <p className="mt-1 text-sm text-slate-800 dark:text-slate-100">{org.subdomain}</p>
+          <div className="flex gap-4">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-950">
+              {currentLogo ? (
+                <img src={currentLogo} alt="" className="h-full w-full object-contain p-1.5" />
+              ) : (
+                <span className="text-sm font-semibold text-slate-400">{orgInitials(name || org.name)}</span>
+              )}
             </div>
-            <div>
-              <p className="ah-label">Database</p>
-              <p className="mt-1 font-mono text-sm text-slate-800 dark:text-slate-100">
-                {org.dbName || '—'}
-              </p>
-            </div>
-            <div>
-              <label htmlFor="edit-org-name" className="ah-label">
-                Name
-              </label>
-              <Input
-                id="edit-org-name"
-                required
-                className="mt-1"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="edit-org-tagline" className="ah-label">
-              Tagline
-            </label>
-            <Input
-              id="edit-org-tagline"
-              className="mt-1"
-              value={tagline}
-              onChange={(e) => setTagline(e.target.value)}
-              maxLength={160}
-              placeholder="Shown on the login page"
-            />
-          </div>
-
-          <div>
-            <p className="ah-label mb-1.5">Logo</p>
-            <div className="flex items-center gap-3">
-              <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900">
-                {currentLogo ? (
-                  <img src={currentLogo} alt="" className="h-full w-full object-contain p-1" />
-                ) : (
-                  <span className="text-[10px] font-medium text-slate-400">None</span>
-                )}
-              </div>
-              <div className="min-w-0 flex-1 space-y-2">
+            <div className="min-w-0 flex-1 space-y-3">
+              <div>
+                <label htmlFor="edit-org-name" className="ah-label">
+                  School name
+                </label>
                 <Input
-                  key={logoInputKey}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
-                  className="text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-brand-700"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0] || null;
-                    if (!file) return;
-                    if (file.size > 1024 * 1024) {
-                      toast.error('Image must be 1MB or smaller');
-                      e.target.value = '';
-                      return;
-                    }
-                    setLogoUploading(true);
-                    try {
-                      const uploaded = await uploadClientLogo(file, org.subdomain);
-                      setUploadedLogo(uploaded);
-                      setClearLogo(false);
-                    } catch (err: unknown) {
-                      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
-                      toast.error(msg || 'Could not upload image');
-                      setLogoInputKey((key) => key + 1);
-                    } finally {
-                      setLogoUploading(false);
-                    }
-                  }}
+                  id="edit-org-name"
+                  required
+                  className="mt-1"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                 />
-                {uploadedLogo ? (
-                  <button
-                    type="button"
-                    className="text-xs font-semibold text-rose-600 hover:underline"
-                    onClick={() => {
-                      setUploadedLogo(null);
-                      setLogoInputKey((key) => key + 1);
-                    }}
-                  >
-                    Clear image
-                  </button>
-                ) : null}
-                <p className="text-[11px] text-slate-400">
-                  {logoUploading
-                    ? 'Uploading to Supabase…'
-                    : 'Max 1MB. Uploaded first; Save sends the image URL with the other fields.'}
-                </p>
-                {(org.logoUrl || detail?.logoUrl) && !clearLogo && !uploadedLogo ? (
-                  <button
-                    type="button"
-                    className="text-xs font-medium text-rose-600 hover:underline"
-                    onClick={() => {
-                      setClearLogo(true);
-                      setUploadedLogo(null);
-                      setLogoInputKey((key) => key + 1);
-                    }}
-                  >
-                    Remove logo
-                  </button>
-                ) : null}
+              </div>
+              <div>
+                <label htmlFor="edit-org-tagline" className="ah-label">
+                  Tagline
+                </label>
+                <Input
+                  id="edit-org-tagline"
+                  className="mt-1"
+                  value={tagline}
+                  onChange={(e) => setTagline(e.target.value)}
+                  maxLength={160}
+                  placeholder="Shown under the school name on login"
+                />
               </div>
             </div>
           </div>
 
-          <div>
-            <p className="ah-label mb-1.5">Point of contact</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              ref={logoInputRef}
+              key={logoInputKey}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+              className="sr-only"
+              onChange={async (e) => {
+                const file = e.target.files?.[0] || null;
+                if (!file) return;
+                if (file.size > 1024 * 1024) {
+                  toast.error('Image must be 1MB or smaller');
+                  e.target.value = '';
+                  return;
+                }
+                setLogoUploading(true);
+                try {
+                  const uploaded = await uploadClientLogo(file, org.subdomain);
+                  setUploadedLogo(uploaded);
+                  setClearLogo(false);
+                } catch (err: unknown) {
+                  const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+                  toast.error(msg || 'Could not upload image');
+                  setLogoInputKey((key) => key + 1);
+                } finally {
+                  setLogoUploading(false);
+                }
+              }}
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={busy}
+              onClick={() => logoInputRef.current?.click()}
+            >
+              {logoUploading ? 'Uploading…' : currentLogo ? 'Replace logo' : 'Upload logo'}
+            </Button>
+            {uploadedLogo ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setUploadedLogo(null);
+                  setLogoInputKey((key) => key + 1);
+                }}
+              >
+                Undo
+              </Button>
+            ) : null}
+            {(org.logoUrl || detail?.logoUrl) && !clearLogo && !uploadedLogo ? (
+              <Button
+                type="button"
+                variant="danger"
+                size="sm"
+                onClick={() => {
+                  setClearLogo(true);
+                  setUploadedLogo(null);
+                  setLogoInputKey((key) => key + 1);
+                }}
+              >
+                Remove
+              </Button>
+            ) : null}
+            {clearLogo ? (
+              <Button type="button" variant="ghost" size="sm" onClick={() => setClearLogo(false)}>
+                Keep logo
+              </Button>
+            ) : null}
+            <p className="text-xs text-slate-400">
+              {logoUploading
+                ? 'Uploading…'
+                : clearLogo
+                  ? 'Logo will be removed when you save.'
+                  : uploadedLogo
+                    ? 'New logo is ready. Save to apply it.'
+                    : 'PNG, JPG, WebP, or SVG. 1MB max.'}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl bg-slate-50 px-3.5 py-2.5 text-xs text-slate-500 dark:bg-slate-950/50">
+            <span className="font-medium text-slate-700 dark:text-slate-200">{org.subdomain}</span>
+            <span aria-hidden className="text-slate-300 dark:text-slate-600">
+              ·
+            </span>
+            <span className="font-mono">{org.dbName || '—'}</span>
+            <span className="text-slate-400">Locked</span>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 px-3.5 py-3 dark:border-slate-700">
+            <p className="ah-label">Point of contact</p>
             {pocLoading ? (
-              <p className="text-sm text-slate-400">Loading…</p>
+              <p className="mt-1.5 text-sm text-slate-400">Loading…</p>
             ) : poc ? (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <p className="ah-label">Name</p>
-                  <p className="mt-1 text-sm text-slate-800 dark:text-slate-100">{poc.name || '—'}</p>
-                </div>
-                <div>
-                  <p className="ah-label">Email</p>
-                  <p className="mt-1 text-sm text-slate-800 dark:text-slate-100">{poc.email}</p>
-                </div>
+              <div className="mt-1.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5">
+                <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{poc.name || '—'}</p>
+                <p className="truncate text-sm text-slate-500">{poc.email}</p>
               </div>
             ) : (
-              <p className="text-sm text-slate-400">No admin provisioned</p>
+              <p className="mt-1.5 text-sm text-slate-400">No admin yet</p>
             )}
           </div>
 
           <PlanPicker value={features} onChange={setFeatures} />
-
-          <div className="flex items-center justify-between gap-3 pt-0.5">
-            <p className="text-sm text-slate-700 dark:text-slate-200">Active</p>
-            <Toggle checked={isActive} onChange={setIsActive} aria-label="Active" />
-          </div>
         </form>
       )}
     </Modal>

@@ -45,7 +45,6 @@ export function Modal({
     <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <div
         className="absolute inset-0 animate-fade-in bg-slate-900/25 dark:bg-slate-950/50"
-        onClick={onClose}
         aria-hidden
       />
 

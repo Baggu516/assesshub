@@ -252,6 +252,7 @@ export function AppLayout() {
         show:
           features.worksheets &&
           !!user &&
+          (isTeacher || isStudent) &&
           (can(user.permissions, PERMISSIONS.WORKSHEET_VIEW) ||
             can(user.permissions, PERMISSIONS.WORKSHEET_MANAGE)),
       },
