@@ -84,7 +84,8 @@ export function TakeAssessmentPage({ kind = 'assessment' }: { kind?: ExamKind })
     }
   };
 
-  if (isLoading) {
+  // A cached in-progress exam must not open the camera while we confirm a finished attempt.
+  if (isLoading || (online && isPlaceholderData && !admitted)) {
     return (
       <div className="mx-auto max-w-2xl space-y-4">
         <Skeleton className="h-8 w-40" />
@@ -120,7 +121,7 @@ export function TakeAssessmentPage({ kind = 'assessment' }: { kind?: ExamKind })
             {error}
           </div>
         ) : null}
-        {online && assessment.cameraMonitor && (!admitted || isPlaceholderData) ? (
+        {online && assessment.cameraMonitor && !admitted ? (
           <ExamReadinessGate
             title={assessment.title}
             durationMinutes={assessment.durationMinutes ?? 60}
