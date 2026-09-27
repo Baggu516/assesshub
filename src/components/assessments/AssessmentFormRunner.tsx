@@ -70,6 +70,10 @@ export function AssessmentFormRunner({
   const [remaining, setRemaining] = useState(
     initialRemainingSeconds == null ? null : Math.max(0, initialRemainingSeconds)
   );
+  useEffect(() => {
+    if (remaining != null || initialRemainingSeconds == null) return;
+    setRemaining(Math.max(0, initialRemainingSeconds));
+  }, [initialRemainingSeconds, remaining]);
 
   const answeredCount = questions.filter((q) => isAnswered(q, answers[q.id || ''])).length;
   const allAnswered = questions.length > 0 && answeredCount === questions.length;
