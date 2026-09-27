@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import { Link, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
@@ -16,7 +17,6 @@ import {
   type AssessmentAssignment,
   type ExamKind,
 } from '@/hooks/api/useAssessments';
-import { useAcademicYearsQuery } from '@/hooks/api/useAcademicYears';
 import { CaptureGallery } from '@/components/assessments/CaptureGallery';
 
 function formatDuration(seconds: number | null | undefined) {
@@ -132,21 +132,11 @@ function downloadCsv(results: AssessmentAssignment[], title: string) {
 export function AssessmentResultsPage({ kind = 'assessment' }: { kind?: ExamKind }) {
   const base = kind === 'online_exam' ? '/online-exams' : '/assessments';
   const { assessmentId } = useParams<{ assessmentId: string }>();
-  const { data: years = [] } = useAcademicYearsQuery();
-  const sortedYears = useMemo(
-    () => [...years].sort((a, b) => b.label.localeCompare(a.label)),
-    [years]
-  );
-  const currentYear = useMemo(
-    () => sortedYears.find((y) => y.isCurrent) || sortedYears[0] || null,
-    [sortedYears]
-  );
-  const [yearId, setYearId] = useState('');
-  const effectiveYear = yearId || currentYear?.id || '';
+  const { yearId } = useAcademicYear();
 
   const { data, isLoading, isError, refetch } = useAssessmentResultsQuery(
     assessmentId,
-    effectiveYear || undefined
+    yearId || undefined
   );
   const { reattempt, hideResult, deleteResult, releaseResults } = useAssessmentMutations();
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -305,21 +295,6 @@ export function AssessmentResultsPage({ kind = 'assessment' }: { kind?: ExamKind
                     ? 'Results announced'
                     : 'Announce results'}
             </Button>
-            {sortedYears.length ? (
-              <select
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950"
-                value={effectiveYear}
-                onChange={(e) => setYearId(e.target.value)}
-              >
-                {sortedYears.map((y) => (
-                  <option key={y.id} value={y.id}>
-                    {y.label}
-                    {y.isCurrent ? ' (current)' : ''}
-                  </option>
-                ))}
-                <option value="all">All years</option>
-              </select>
-            ) : null}
           </>
         }
       />

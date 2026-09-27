@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { uploadProctorCapture, type AssessmentQuestion } from '@/hooks/api/useAssessments';
+import { SubmitConfirmDialog } from './SubmitConfirmDialog';
 
 export type CbtAnswerState = {
   selectedOptionIds: string[];
@@ -171,7 +172,10 @@ export function CbtAttemptRunner({
   const [remaining, setRemaining] = useState(
     initialRemainingSeconds == null ? null : Math.max(0, initialRemainingSeconds)
   );
-  const [paletteOpen, setPaletteOpen] = useState(true);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches
+  );
   const [exitCount, setExitCount] = useState(fullscreenExitCount);
   const [needsFullscreenGesture, setNeedsFullscreenGesture] = useState(false);
   const exitsRemaining = Math.max(0, maxFullscreenExits - exitCount);
@@ -390,15 +394,8 @@ export function CbtAttemptRunner({
   const isFirst = currentIndex <= 0;
 
   const confirmSubmit = () => {
-    if (!canSubmit) return;
-    const unanswered = questions.filter((q) => !isAnswered(q, answers[q.id || ''])).length;
-    if (unanswered > 0) {
-      const ok = window.confirm(
-        `You have not answered ${unanswered} question${unanswered === 1 ? '' : 's'}. Submit anyway?`
-      );
-      if (!ok) return;
-    }
-    handleSubmit('manual');
+    if (!canSubmit || submitting) return;
+    setConfirmOpen(true);
   };
 
   const lowTime = remaining != null && remaining > 0 && remaining <= 60;
@@ -428,7 +425,7 @@ export function CbtAttemptRunner({
   const activeSection = questionSection(question, fallbackSection);
 
   return (
-    <div ref={rootRef} className="fixed inset-0 z-[80] flex flex-col bg-[#f4f6f8] text-slate-900">
+    <div ref={rootRef} className="fixed inset-0 z-[80] flex flex-col bg-[linear-gradient(180deg,#f7f8fb_0%,#eef2f7_100%)] text-slate-900">
       {lockFullscreen && liveCamera && !cameraLive ? (
         <div className="absolute inset-0 z-[95] flex items-center justify-center bg-slate-900/80 p-6">
           <div className="max-w-md rounded-2xl bg-white p-6 text-center shadow-xl">
@@ -476,48 +473,59 @@ export function CbtAttemptRunner({
           </div>
         </div>
       ) : null}
-      <header className="border-b border-slate-300 bg-[#1e3a5f] text-white">
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
-          <div className="min-w-0">
-            <p className="truncate font-semibold">{title}</p>
-            <p className="text-xs text-white/70">{lockFullscreen ? 'Online exam' : 'Assessment'}</p>
+      <header className="shrink-0 border-b border-slate-800/40 bg-slate-900 text-white">
+        <div className="flex items-center gap-3 px-4 py-3 sm:px-6">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold tracking-tight sm:text-base">{title}</p>
+            <p className="truncate text-xs text-white/60">
+              {studentName || 'Student'}
+              <span className="hidden sm:inline"> · {lockFullscreen ? 'Online exam' : 'Assessment'}</span>
+              <span>
+                {' '}
+                · {answeredCount}/{questions.length} answered
+              </span>
+            </p>
           </div>
-          <div className="flex flex-wrap items-center gap-3 text-sm">
-            {remaining != null ? (
-              <span
-                className={clsx(
-                  'rounded-md px-3 py-1.5 font-mono font-bold tabular-nums',
-                  lowTime ? 'animate-pulse bg-red-500' : 'bg-white/15'
-                )}
-              >
-                Time Left :- {formatClock(remaining)}
-              </span>
-            ) : (
-              <span className="rounded-md bg-white/15 px-3 py-1.5 text-xs font-semibold">Untimed</span>
-            )}
-            <span className="font-medium">{studentName || 'Student'}</span>
-            {lockFullscreen && liveCamera ? (
-              <span className="relative h-10 w-14 overflow-hidden rounded-md bg-black ring-1 ring-white/40">
-                <video
-                  ref={cameraRef}
-                  autoPlay
-                  muted
-                  playsInline
-                  className="h-full w-full -scale-x-100 object-cover"
-                />
-              </span>
-            ) : null}
-            {lockFullscreen ? (
-              <span className="rounded-md bg-amber-500/90 px-2.5 py-1 text-xs font-bold text-slate-900">
-                FS exits left: {exitsRemaining}/{maxFullscreenExits}
-              </span>
-            ) : null}
-          </div>
+          {remaining != null ? (
+            <span
+              className={clsx(
+                'shrink-0 rounded-full px-3 py-1.5 font-mono text-sm font-semibold tabular-nums',
+                lowTime ? 'animate-pulse bg-rose-500 text-white' : 'bg-white/10 text-white'
+              )}
+            >
+              {formatClock(remaining)}
+            </span>
+          ) : (
+            <span className="shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium">Untimed</span>
+          )}
+          {lockFullscreen && liveCamera ? (
+            <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full bg-black ring-2 ring-white/30">
+              <video
+                ref={cameraRef}
+                autoPlay
+                muted
+                playsInline
+                className="h-full w-full -scale-x-100 object-cover"
+              />
+            </span>
+          ) : null}
         </div>
-        <div className="flex flex-wrap gap-2 px-4 pb-2.5">
+        <div className="h-0.5 bg-white/10">
+          <div
+            className="h-full bg-emerald-400 transition-all"
+            style={{ width: `${questions.length ? Math.round((answeredCount / questions.length) * 100) : 0}%` }}
+          />
+        </div>
+        <div className="flex items-center gap-2 overflow-x-auto px-4 py-2.5 sm:px-6">
+          {lockFullscreen ? (
+            <span className="shrink-0 rounded-full bg-amber-400/90 px-2.5 py-1 text-[11px] font-semibold text-slate-900">
+              {exitsRemaining} exit{exitsRemaining === 1 ? '' : 's'} left
+            </span>
+          ) : null}
           {groupedSections.map((group) => {
             const isActive = group.name === activeSection;
             const count = group.items.length;
+            const done = group.items.filter(({ q }) => isAnswered(q, answers[q.id || ''])).length;
             return (
               <button
                 key={group.name}
@@ -528,13 +536,16 @@ export function CbtAttemptRunner({
                   if (first) goTo(first.index);
                 }}
                 className={clsx(
-                  'rounded px-3 py-1 text-xs font-bold uppercase tracking-wide',
+                  'shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition',
                   isActive
-                    ? 'bg-red-600 text-white'
+                    ? 'bg-white text-slate-900'
                     : 'bg-white/10 text-white/80 hover:bg-white/15 disabled:cursor-default disabled:opacity-50'
                 )}
               >
-                {group.name} ({count})
+                {group.name}
+                <span className={clsx('ml-1.5 tabular-nums', isActive ? 'text-slate-500' : 'text-white/50')}>
+                  {done}/{count}
+                </span>
               </button>
             );
           })}
@@ -549,27 +560,27 @@ export function CbtAttemptRunner({
 
       <div className="flex min-h-0 flex-1">
         <main className="flex min-w-0 flex-1 flex-col">
-          <div className="border-b border-slate-200 bg-slate-100 px-4 py-2 text-sm">
-            <span className="font-bold text-[#1e3a5f]">Qus. No {currentIndex + 1}</span>
-            <span className="mx-2 text-slate-400">|</span>
-            <span className="font-semibold">{activeSection}</span>
-            <span className="mx-2 text-slate-400">|</span>
-            <span className="font-semibold">{typeLabel(question.type)}</span>
-            <span className="mx-2 text-slate-400">|</span>
-            <span>
-              Marks : {question.points}
-              {question.type === 'multi_select' ? ' (select all that apply)' : ''}
-            </span>
-          </div>
-
-          <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6">
-            <p className="text-base font-semibold leading-relaxed text-slate-900">{question.prompt}</p>
+          <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-8">
+            <article className="mx-auto w-full max-w-3xl rounded-3xl bg-white px-5 py-6 shadow-[0_20px_50px_-28px_rgba(15,23,42,0.45)] ring-1 ring-slate-200/80 sm:px-8 sm:py-8">
+              <div className="flex items-center justify-between gap-3 text-xs">
+                <span className="font-semibold text-slate-500">
+                  Question {currentIndex + 1} of {questions.length}
+                  <span className="text-slate-300"> · </span>
+                  {activeSection}
+                </span>
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-500">
+                  {typeLabel(question.type)} · {question.points} mark{question.points === 1 ? '' : 's'}
+                </span>
+              </div>
+              <p className="mt-4 text-xl font-semibold leading-snug tracking-tight text-slate-900 sm:text-2xl">
+                {question.prompt}
+              </p>
 
             {question.type === 'short_answer' ? (
-              <div className="mt-5 max-w-md">
+              <div className="mt-6 max-w-md">
                 <input
                   type="text"
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm"
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
                   placeholder="1–2 words"
                   maxLength={100}
                   value={answer.textAnswer}
@@ -577,7 +588,7 @@ export function CbtAttemptRunner({
                 />
               </div>
             ) : (
-              <div className="mt-5 space-y-2.5">
+              <div className="mt-6 space-y-3">
                 {question.options.map((opt, displayIndex) => {
                   const id = opt.id || '';
                   const isSelected =
@@ -588,10 +599,10 @@ export function CbtAttemptRunner({
                     <label
                       key={id}
                       className={clsx(
-                        'flex cursor-pointer items-start gap-3 rounded-md border px-4 py-3 transition',
+                        'flex cursor-pointer items-center gap-3 rounded-2xl border px-3.5 py-3 transition',
                         isSelected
-                          ? 'border-[#1e3a5f] bg-[#e8eef6]'
-                          : 'border-slate-300 bg-slate-100 hover:border-slate-400'
+                          ? 'border-emerald-500 bg-emerald-50 shadow-sm ring-1 ring-emerald-500'
+                          : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
                       )}
                     >
                       <input
@@ -608,26 +619,82 @@ export function CbtAttemptRunner({
                             setAnswer({ ...answer, selectedOptionIds: next });
                           }
                         }}
-                        className="mt-0.5 h-4 w-4 shrink-0 accent-[#1e3a5f]"
+                        className="sr-only"
                       />
-                      <span className="w-5 shrink-0 pt-0.5 text-sm font-bold text-slate-500">
+                      <span
+                        className={clsx(
+                          'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold',
+                          isSelected ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500'
+                        )}
+                      >
                         {optionLabel(displayIndex)}
                       </span>
-                      <span className="min-w-0 flex-1 text-sm leading-relaxed">{opt.text}</span>
+                      <span className="min-w-0 flex-1 text-sm leading-relaxed text-slate-800">{opt.text}</span>
                     </label>
                   );
                 })}
               </div>
             )}
+            </article>
           </div>
 
-          <div className="border-t border-slate-300 bg-white px-4 py-3">
-            <div className="flex flex-wrap items-center gap-2">
+          <div className="border-t border-slate-200 bg-white/95 px-3 py-3 backdrop-blur sm:px-6">
+            <div className="grid grid-cols-2 gap-2 md:hidden">
               <button
                 type="button"
                 disabled={isFirst}
                 onClick={() => goTo(currentIndex - 1)}
-                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-700 disabled:opacity-40"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                disabled={isLast}
+                onClick={() => goTo(currentIndex + 1)}
+                className="rounded-xl bg-slate-900 px-3 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
+              >
+                Next
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (qid) setMarked((prev) => ({ ...prev, [qid]: true }));
+                  if (!isLast) goTo(currentIndex + 1);
+                }}
+                className="rounded-xl bg-amber-100 px-3 py-2.5 text-sm font-semibold text-amber-900"
+              >
+                Review
+              </button>
+              <button
+                type="button"
+                onClick={clearResponse}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700"
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaletteOpen((open) => !open)}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700"
+              >
+                {paletteOpen ? 'Hide list' : 'Questions'}
+              </button>
+              <button
+                type="button"
+                disabled={!canSubmit || submitting}
+                onClick={confirmSubmit}
+                className="rounded-xl bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-emerald-100 disabled:text-emerald-700"
+              >
+                {submitting ? 'Submitting…' : 'Submit'}
+              </button>
+            </div>
+            <div className="hidden items-center gap-2 md:flex">
+              <button
+                type="button"
+                disabled={isFirst}
+                onClick={() => goTo(currentIndex - 1)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
               >
                 Previous
               </button>
@@ -637,40 +704,40 @@ export function CbtAttemptRunner({
                   if (qid) setMarked((prev) => ({ ...prev, [qid]: true }));
                   if (!isLast) goTo(currentIndex + 1);
                 }}
-                className="rounded-md bg-amber-500 px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-900 hover:bg-amber-400"
+                className="rounded-xl bg-amber-100 px-4 py-2.5 text-sm font-semibold text-amber-900 hover:bg-amber-200"
               >
-                Mark for review &amp; next
+                Review &amp; next
               </button>
               <button
                 type="button"
                 onClick={clearResponse}
-                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-700"
+                className="rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-500 hover:bg-slate-100"
               >
-                Clear response
+                Clear
               </button>
               <div className="ml-auto flex items-center gap-2">
                 <button
                   type="button"
                   disabled={isLast}
                   onClick={() => goTo(currentIndex + 1)}
-                  className="rounded-md bg-emerald-600 px-3 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-emerald-700 disabled:opacity-40"
+                  className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-40"
                 >
-                  Save &amp; next
+                  Next
                 </button>
                 {paletteOpen ? null : (
                   <button
                     type="button"
                     disabled={!canSubmit || submitting}
                     onClick={confirmSubmit}
-                    className="rounded-md bg-emerald-600 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-200 disabled:text-emerald-800"
+                    className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-100 disabled:text-emerald-700"
                   >
-                    {submitting ? 'Submitting…' : 'Submit test'}
+                    {submitting ? 'Submitting…' : 'Submit'}
                   </button>
                 )}
               </div>
             </div>
             {!paletteOpen && !canSubmit && remaining != null ? (
-              <p className="mt-1 text-right text-[11px] text-slate-500">
+              <p className="mt-2 text-center text-[11px] leading-snug text-slate-500 md:text-right">
                 Submit unlocks after 20% of the timer ({formatClock(secondsUntilUnlock)})
               </p>
             ) : null}
@@ -678,44 +745,40 @@ export function CbtAttemptRunner({
         </main>
 
         {paletteOpen ? (
-        <aside className="flex min-h-0 w-72 shrink-0 flex-col overflow-hidden border-l border-slate-300 bg-white">
-          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-            <p className="text-xs font-bold uppercase tracking-wide text-[#1e3a5f]">Question palette</p>
+        <>
+        <button
+          type="button"
+          aria-label="Close question palette"
+          className="fixed inset-0 z-[84] bg-slate-900/40 md:hidden"
+          onClick={() => setPaletteOpen(false)}
+        />
+        <aside className="z-[85] flex min-h-0 w-80 shrink-0 flex-col overflow-hidden border-l border-slate-200 bg-white max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:top-auto max-md:h-[min(70vh,32rem)] max-md:w-full max-md:rounded-t-3xl max-md:border-l-0 max-md:shadow-2xl">
+          <div className="flex items-center justify-between px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">Questions</p>
+              <p className="text-xs text-slate-400">
+                {answeredCount} of {questions.length} answered
+              </p>
+            </div>
             <button
               type="button"
               aria-label="Close question palette"
               onClick={() => setPaletteOpen(false)}
-              className="flex h-6 w-6 items-center justify-center rounded text-lg leading-none text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none text-slate-400 hover:bg-slate-100 hover:text-slate-700"
             >
               ×
             </button>
           </div>
-          <div className="space-y-1.5 border-b border-slate-200 px-4 py-3 text-[11px] text-slate-600">
-            <p className="font-semibold uppercase tracking-wide text-slate-800">Legend</p>
-            <p>
-              <span className="mr-1.5 inline-block h-2.5 w-2.5 rounded-sm bg-emerald-500" /> Answered
-            </p>
-            <p>
-              <span className="mr-1.5 inline-block h-2.5 w-2.5 rounded-sm bg-red-500" /> Not answered
-            </p>
-            <p>
-              <span className="mr-1.5 inline-block h-2.5 w-2.5 rounded-full bg-violet-500" /> Marked
-            </p>
-            <p>
-              <span className="mr-1.5 inline-block h-2.5 w-2.5 rounded-sm bg-slate-300" /> Not visited
-            </p>
-            <p>
-              <span className="mr-1.5 inline-block h-2.5 w-2.5 rounded-full bg-violet-600 ring-2 ring-violet-300" />{' '}
-              Answered &amp; marked
-            </p>
-            <p className="pt-1 text-xs text-slate-500">
-              {answeredCount}/{questions.length} answered
-            </p>
+          <div className="flex flex-wrap gap-x-3 gap-y-1.5 border-y border-slate-100 px-4 py-2.5 text-[11px] text-slate-500">
+            <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Answered</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-rose-500" /> Seen</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-violet-500" /> Review</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-slate-300" /> New</span>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
             {groupedSections.map((group) => (
               <div key={group.name} className="mb-4 last:mb-0">
-                <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">{group.name}</p>
+                <p className="mb-2 text-xs font-semibold text-slate-500">{group.name}</p>
                 {group.items.length ? (
                   <div className="grid grid-cols-5 gap-2">
                     {group.items.map(({ q, index }, localIndex) => {
@@ -730,10 +793,9 @@ export function CbtAttemptRunner({
                           type="button"
                           onClick={() => goTo(index)}
                           className={clsx(
-                            'flex h-9 items-center justify-center text-xs font-bold tabular-nums',
-                            isMarked ? 'rounded-full' : 'rounded',
+                            'flex h-10 items-center justify-center rounded-xl text-xs font-bold tabular-nums transition',
                             paletteTone({ answered, marked: isMarked, visited: isVisited }),
-                            isCurrent && 'outline outline-2 outline-offset-1 outline-[#1e3a5f]'
+                            isCurrent && 'ring-2 ring-slate-900 ring-offset-2'
                           )}
                         >
                           {localIndex + 1}
@@ -757,24 +819,36 @@ export function CbtAttemptRunner({
               type="button"
               disabled={!canSubmit || submitting}
               onClick={confirmSubmit}
-              className="w-full rounded-md bg-emerald-600 px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-200 disabled:text-emerald-800"
+              className="w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-100 disabled:text-emerald-700"
             >
               {submitting ? 'Submitting…' : 'Submit test'}
             </button>
           </div>
         </aside>
+        </>
         ) : (
           <button
             type="button"
             aria-label="Open question palette"
             title="Question palette"
             onClick={() => setPaletteOpen(true)}
-            className="flex w-8 shrink-0 items-center justify-center border-l border-slate-300 bg-white text-lg text-slate-500 hover:bg-slate-50 hover:text-[#1e3a5f]"
+            className="hidden w-9 shrink-0 items-center justify-center border-l border-slate-200 bg-white text-lg text-slate-400 hover:bg-slate-50 hover:text-slate-800 md:flex"
           >
             ‹
           </button>
         )}
       </div>
+      <SubmitConfirmDialog
+        open={confirmOpen}
+        answered={answeredCount}
+        total={questions.length}
+        submitting={submitting}
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={() => {
+          setConfirmOpen(false);
+          handleSubmit('manual');
+        }}
+      />
     </div>
   );
 }

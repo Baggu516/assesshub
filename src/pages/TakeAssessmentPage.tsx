@@ -288,81 +288,50 @@ function SubmissionHoldView({
   online: boolean;
   onBack: () => void;
 }) {
-  const dots = useMemo(
-    () =>
-      Array.from({ length: 36 }, (_, i) => ({
-        id: i,
-        left: `${(i * 17) % 100}%`,
-        top: `${(i * 29) % 100}%`,
-        size: 6 + (i % 5) * 3,
-        color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-      })),
-    []
-  );
   const when = formatHoldDate(submittedAt);
   const blurb = (description || '').trim();
-  const meta = [blurb.length > 48 ? `${blurb.slice(0, 48).trim()}…` : blurb, when].filter(Boolean).join(' · ');
-  const examLabel = online ? 'online assessment' : 'assessment';
 
   return (
-    <div className="absolute inset-0 z-10 overflow-y-auto bg-[linear-gradient(115deg,#e8f7f0_0%,#f4f8f5_46%,#f8f0e6_100%)] dark:bg-[linear-gradient(115deg,#10211c_0%,#121820_52%,#211c16_100%)]">
-      <div className="relative flex min-h-full flex-col px-4 py-6 md:px-8 md:py-8">
-      <ConfettiBurst />
-      <div className="pointer-events-none absolute inset-0" aria-hidden>
-        {dots.map((dot) => (
-          <span
-            key={dot.id}
-            className="absolute rounded-full opacity-70"
-            style={{
-              left: dot.left,
-              top: dot.top,
-              width: dot.size,
-              height: dot.size,
-              backgroundColor: dot.color,
-            }}
-          />
-        ))}
-      </div>
+    <div className="absolute inset-0 z-10 overflow-y-auto bg-[linear-gradient(180deg,#f7f8fb_0%,#eef3f8_100%)] dark:bg-slate-950">
+      <div className="relative flex min-h-full flex-col px-4 pb-10 pt-16 md:px-8 md:py-10">
+        <ConfettiBurst />
+        <div className="relative z-10 mx-auto flex w-full max-w-lg flex-1 flex-col">
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex w-fit items-center gap-1.5 rounded-full px-1 py-1 text-sm font-medium text-slate-500 transition hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
+          >
+            <span aria-hidden>←</span>
+            {online ? 'All online assessments' : 'All assessments'}
+          </button>
 
-      <div className="relative z-10 mx-auto flex w-full max-w-5xl shrink-0 flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-800/80 dark:text-emerald-200/80">
-            {online ? 'Online assessment result' : 'Assessment result'}
-          </p>
-          <h1 className="mt-2 font-display text-4xl font-bold uppercase tracking-tight text-slate-900 dark:text-white">
-            {title}
-          </h1>
-          {meta ? <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{meta}</p> : null}
-        </div>
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-        >
-          <span aria-hidden>←</span>
-          {online ? 'All online assessments' : 'All assessments'}
-        </button>
-      </div>
+          <div className="my-auto w-full rounded-[28px] bg-white px-6 py-10 text-center shadow-[0_24px_60px_-32px_rgba(15,23,42,0.35)] ring-1 ring-slate-200/80 dark:bg-slate-900 dark:ring-slate-800 sm:px-10">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 ring-8 ring-emerald-50/70 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/10">
+              <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">
+              Submitted
+            </p>
+            <h1 className="mt-2 font-display text-2xl font-semibold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+              {title}
+            </h1>
+            {when || blurb ? (
+              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                {[blurb, when].filter(Boolean).join(' · ')}
+              </p>
+            ) : null}
+            <p className="mt-5 text-base text-slate-600 dark:text-slate-300">Thank you. Your attempt is in.</p>
 
-      <div className="relative z-10 mx-auto my-auto w-full max-w-md shrink-0 rounded-3xl bg-white px-8 py-10 text-center shadow-[0_20px_60px_-24px_rgba(15,23,42,0.35)] dark:bg-slate-900">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
-          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} aria-hidden>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2" />
-            <circle cx="12" cy="12" r="8" />
-          </svg>
+            <div className="mt-6 rounded-2xl bg-slate-50 px-5 py-4 text-left dark:bg-slate-950/60">
+              <p className="text-sm font-semibold text-slate-900 dark:text-white">Results on hold</p>
+              <p className="mt-1.5 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+                The academy will release them soon. You will get an email when they are ready, then open them here. Scores stay on the site, not in the email.
+              </p>
+            </div>
+          </div>
         </div>
-        <h2 className="mt-5 font-display text-xl font-bold text-emerald-900 dark:text-emerald-100">
-          Thank you for attempting!
-        </h2>
-        <p className="mt-3 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
-          Your {examLabel} was submitted{when ? ` on ${when}` : ''}. Great work completing it.
-        </p>
-        <p className="mt-6 text-sm font-bold text-slate-900 dark:text-white">Results on hold</p>
-        <p className="mt-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
-          The academy will release results soon. You will get an email when they are available — then open them here on the site.
-        </p>
-        <p className="mt-5 text-xs text-slate-400">Scores are not shared by email.</p>
-      </div>
       </div>
     </div>
   );
@@ -525,13 +494,13 @@ function StudentResultView({
     <div className="absolute inset-0 z-10 overflow-y-auto bg-[linear-gradient(115deg,#e8f7f0_0%,#f4f8f5_46%,#f8f0e6_100%)] dark:bg-[linear-gradient(115deg,#10211c_0%,#121820_52%,#211c16_100%)]">
       <div className="relative flex min-h-full flex-col">
       <ConfettiBurst />
-      <div className="relative z-10 mx-auto flex min-h-full w-full max-w-5xl flex-col px-4 py-8 md:px-8">
+      <div className="relative z-10 mx-auto flex min-h-full w-full max-w-5xl flex-col px-4 pb-8 pt-16 md:px-8 md:py-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-800/80 dark:text-emerald-200/80">
               {online ? 'Online assessment result' : 'Assessment result'}
             </p>
-            <h1 className="mt-2 font-display text-4xl font-bold uppercase tracking-tight text-slate-900 dark:text-white">
+            <h1 className="mt-2 font-display text-3xl font-bold uppercase leading-tight tracking-tight text-slate-900 dark:text-white sm:text-4xl">
               {title}
             </h1>
             {meta ? <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{meta}</p> : null}

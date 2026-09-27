@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import type { AssessmentQuestion } from '@/hooks/api/useAssessments';
+import { SubmitConfirmDialog } from './SubmitConfirmDialog';
 
 type AnswerState = {
   selectedOptionIds: string[];
@@ -64,6 +65,7 @@ export function AssessmentFormRunner({
   ) => Promise<void>;
 }) {
   const submittedRef = useRef(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [answers, setAnswers] = useState<Record<string, AnswerState>>(() => readAnswers(storageKey));
   const [remaining, setRemaining] = useState(
     initialRemainingSeconds == null ? null : Math.max(0, initialRemainingSeconds)
@@ -83,6 +85,35 @@ export function AssessmentFormRunner({
     return names;
   }, [questions]);
   const showSections = sections.length > 1;
+  const [activeSection, setActiveSection] = useState('');
+  const listTopRef = useRef<HTMLDivElement>(null);
+  const currentSection = showSections
+    ? sections.includes(activeSection)
+      ? activeSection
+      : sections[0]
+    : '';
+  const sectionIndex = Math.max(0, sections.indexOf(currentSection));
+
+  const visibleQuestions = useMemo(
+    () =>
+      questions
+        .map((q, index) => ({ q, index }))
+        .filter(({ q }) => !showSections || (q.section || '').trim() === currentSection),
+    [questions, showSections, currentSection]
+  );
+
+  const sectionStats = (name: string) => {
+    const items = questions.filter((q) => (q.section || '').trim() === name);
+    const done = items.filter((q) => isAnswered(q, answers[q.id || ''])).length;
+    return { done, total: items.length };
+  };
+
+  const selectSection = (name: string) => {
+    setActiveSection(name);
+    requestAnimationFrame(() => {
+      listTopRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  };
 
   const buildPayload = useCallback(
     () =>
@@ -97,20 +128,19 @@ export function AssessmentFormRunner({
     [questions, answers]
   );
 
+  const requestSubmit = useCallback(() => {
+    if (submittedRef.current || submitting) return;
+    setConfirmOpen(true);
+  }, [submitting]);
+
   const handleSubmit = useCallback(() => {
     if (submittedRef.current || submitting) return;
-    const unanswered = questions.length - questions.filter((q) => isAnswered(q, answers[q.id || ''])).length;
-    if (unanswered > 0) {
-      const ok = window.confirm(
-        `You have not answered ${unanswered} question${unanswered === 1 ? '' : 's'}. Submit anyway?`
-      );
-      if (!ok) return;
-    }
+    setConfirmOpen(false);
     submittedRef.current = true;
     Promise.resolve(onSubmit(buildPayload(), 'manual')).catch(() => {
       submittedRef.current = false;
     });
-  }, [submitting, questions, answers, onSubmit, buildPayload]);
+  }, [submitting, questions, onSubmit, buildPayload]);
 
   const handleSubmitRef = useRef(handleSubmit);
   handleSubmitRef.current = handleSubmit;
@@ -148,8 +178,8 @@ export function AssessmentFormRunner({
   const blurb = (description || '').trim();
 
   return (
-    <div className="absolute inset-0 z-10 overflow-y-auto bg-[linear-gradient(115deg,#e8f7f0_0%,#f4f8f5_42%,#f8f0e6_100%)] dark:bg-[linear-gradient(115deg,#10211c_0%,#121820_52%,#211c16_100%)]">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-8 md:px-6">
+    <div ref={listTopRef} className="absolute inset-0 z-10 overflow-y-auto bg-[linear-gradient(115deg,#e8f7f0_0%,#f4f8f5_42%,#f8f0e6_100%)] dark:bg-[linear-gradient(115deg,#10211c_0%,#121820_52%,#211c16_100%)]">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 pb-8 pt-16 md:px-6 md:py-8">
         <div className="overflow-hidden rounded-2xl bg-white shadow-sm dark:bg-slate-900">
           <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
             <div className="min-w-0">
@@ -178,7 +208,7 @@ export function AssessmentFormRunner({
               <button
                 type="button"
                 disabled={submitting}
-                onClick={handleSubmit}
+                onClick={requestSubmit}
                 className="rounded-full bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
               >
                 {submitting ? 'Submitting…' : 'Submit'}
@@ -196,17 +226,50 @@ export function AssessmentFormRunner({
           </p>
         ) : null}
 
-        {questions.map((question, index) => {
+        {showSections ? (
+          <div className="sticky top-14 z-20 md:top-2">
+            <div
+              role="tablist"
+              aria-label="Sections"
+              className="flex gap-2 overflow-x-auto rounded-2xl border border-white/70 bg-white/90 p-2 shadow-sm backdrop-blur dark:border-slate-700 dark:bg-slate-900/90"
+            >
+              {sections.map((name, i) => {
+                const { done, total } = sectionStats(name);
+                const active = name === currentSection;
+                const complete = total > 0 && done === total;
+                return (
+                  <button
+                    key={name}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => selectSection(name)}
+                    className={clsx(
+                      'flex min-w-[8.5rem] shrink-0 flex-col items-start rounded-xl px-3.5 py-2.5 text-left transition',
+                      active
+                        ? 'bg-emerald-700 text-white shadow-sm'
+                        : 'bg-slate-50 text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-100'
+                    )}
+                  >
+                    <span className={clsx('text-[10px] font-semibold uppercase tracking-wide', active ? 'text-white/70' : 'text-slate-400')}>
+                      Part {i + 1}
+                    </span>
+                    <span className="mt-0.5 max-w-[12rem] truncate text-sm font-semibold">{name}</span>
+                    <span className={clsx('mt-1 text-[11px] font-medium', active ? 'text-white/80' : 'text-slate-400')}>
+                      {done}/{total} answered{complete ? ' · Done' : ''}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+
+        {visibleQuestions.map(({ q: question, index }) => {
           const qid = question.id || '';
           const answer = answers[qid] || { selectedOptionIds: [], textAnswer: '' };
-          const section = (question.section || '').trim();
-          const previousSection = (questions[index - 1]?.section || '').trim();
-          const showHeading = showSections && section && section !== previousSection;
           return (
             <div key={qid || index}>
-              {showHeading ? (
-                <p className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-slate-500">{section}</p>
-              ) : null}
               <article className="rounded-2xl bg-white px-5 py-5 shadow-sm dark:bg-slate-900 sm:px-6">
                 <div className="flex flex-wrap items-center gap-2 text-xs">
                   <span className="font-bold text-slate-500">Q{index + 1}</span>
@@ -274,6 +337,30 @@ export function AssessmentFormRunner({
           );
         })}
 
+        {showSections ? (
+          <div className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm dark:bg-slate-900">
+            <button
+              type="button"
+              disabled={sectionIndex === 0}
+              onClick={() => selectSection(sections[sectionIndex - 1])}
+              className="rounded-full px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              Previous
+            </button>
+            <p className="text-xs font-medium text-slate-400">
+              {currentSection} · {sectionIndex + 1} of {sections.length}
+            </p>
+            <button
+              type="button"
+              disabled={sectionIndex >= sections.length - 1}
+              onClick={() => selectSection(sections[sectionIndex + 1])}
+              className="rounded-full bg-slate-900 px-3.5 py-1.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-40 dark:bg-white dark:text-slate-900"
+            >
+              Next
+            </button>
+          </div>
+        ) : null}
+
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white px-5 py-4 shadow-sm dark:bg-slate-900">
           <p className="text-sm text-slate-500">
             {allAnswered
@@ -283,13 +370,21 @@ export function AssessmentFormRunner({
           <button
             type="button"
             disabled={submitting}
-            onClick={handleSubmit}
+            onClick={requestSubmit}
             className="rounded-full bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
           >
             {submitting ? 'Submitting…' : 'Submit test'}
           </button>
         </div>
       </div>
+      <SubmitConfirmDialog
+        open={confirmOpen}
+        answered={answeredCount}
+        total={questions.length}
+        submitting={submitting}
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={handleSubmit}
+      />
     </div>
   );
 }
