@@ -17,6 +17,7 @@ export type OrgSidebarLabels = {
   myAssessments?: string;
   groupStudents?: string;
   classes?: string;
+  myClass?: string;
   academicYears?: string;
   classMasters?: string;
   promotions?: string;
@@ -35,6 +36,7 @@ const FALLBACK = {
   myAssessments: 'My assessments',
   groupStudents: 'Group students',
   classes: 'Classes',
+  myClass: 'My class',
   academicYears: 'Academic years',
   classMasters: 'Class masters',
   promotions: 'Promotions',
@@ -72,6 +74,8 @@ export function resolveNavLabel(
       return t(sl.groupStudents, FALLBACK.groupStudents);
     case '/classes':
       return t(sl.classes, FALLBACK.classes);
+    case '/my-class':
+      return t(sl.myClass, FALLBACK.myClass);
     case '/academic-years':
       return t(sl.academicYears, FALLBACK.academicYears);
     case '/class-masters':

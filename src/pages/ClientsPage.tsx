@@ -25,6 +25,7 @@ type PlatformOrg = {
   id: string;
   name: string;
   subdomain: string;
+  registrationPrefix?: string | null;
   dbName?: string | null;
   isActive: boolean;
   logoUrl?: string | null;
@@ -47,6 +48,7 @@ const defaultFeatures: OrgFeatures = {
 const emptyCreateForm = {
   name: '',
   subdomain: '',
+  registrationPrefix: '',
   tagline: '',
   isActive: true,
   features: { ...defaultFeatures },
@@ -188,6 +190,18 @@ function slugifySubdomain(value: string) {
     .replace(/^-|-$/g, '');
 }
 
+/** Suggest register ID prefix from school name (letters/digits only). */
+function suggestRegisterPrefix(value: string) {
+  return value
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .toUpperCase()
+    .slice(0, 16);
+}
+
+function normalizeRegisterPrefixInput(value: string) {
+  return value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 24);
+}
+
 type UploadedLogo = { logoUrl: string; logoStoragePath: string };
 
 type OrgSaveBody = {
@@ -195,6 +209,7 @@ type OrgSaveBody = {
   isActive: boolean;
   features: OrgFeatures;
   tagline: string;
+  registrationPrefix?: string;
   clearLogo?: boolean;
   logoUrl?: string;
   logoStoragePath?: string;
@@ -223,6 +238,7 @@ function EditOrganizationModal({
 }) {
   const [name, setName] = useState('');
   const [tagline, setTagline] = useState('');
+  const [registrationPrefix, setRegistrationPrefix] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [features, setFeatures] = useState<OrgFeatures>(defaultFeatures);
   const [uploadedLogo, setUploadedLogo] = useState<UploadedLogo | null>(null);
@@ -250,6 +266,7 @@ function EditOrganizationModal({
   const resetFields = () => {
     setName('');
     setTagline('');
+    setRegistrationPrefix('');
     setIsActive(true);
     setFeatures(defaultFeatures);
     setUploadedLogo(null);
@@ -271,12 +288,22 @@ function EditOrganizationModal({
     const source = fromDetail ? detail : org;
     setName(source.name);
     setTagline(source.tagline || '');
+    setRegistrationPrefix(source.registrationPrefix || '');
     setIsActive(source.isActive);
     setFeatures(resolveFeatures(source));
     setUploadedLogo(null);
     setClearLogo(false);
     setLogoInputKey((key) => key + 1);
   }, [open, org, detail]);
+
+  const lockedRegisterPrefix = Boolean(detail?.registrationPrefix || org?.registrationPrefix);
+  const effectiveRegisterPrefix =
+    (lockedRegisterPrefix
+      ? detail?.registrationPrefix || org?.registrationPrefix
+      : registrationPrefix) || '';
+  const registerPreview = effectiveRegisterPrefix
+    ? `${String(effectiveRegisterPrefix).toUpperCase()}48291`
+    : null;
 
   return (
     <Modal
@@ -320,6 +347,9 @@ function EditOrganizationModal({
               features,
               tagline: tagline.trim(),
             };
+            if (!lockedRegisterPrefix && registrationPrefix.trim().length >= 2) {
+              body.registrationPrefix = normalizeRegisterPrefixInput(registrationPrefix);
+            }
             if (uploadedLogo) {
               body.logoUrl = uploadedLogo.logoUrl;
               body.logoStoragePath = uploadedLogo.logoStoragePath;
@@ -461,6 +491,40 @@ function EditOrganizationModal({
             <span className="text-slate-400">Locked</span>
           </div>
 
+          <div>
+            <label htmlFor="edit-org-register" className="ah-label">
+              Register ID string
+            </label>
+            {lockedRegisterPrefix ? (
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl bg-slate-50 px-3.5 py-2.5 text-xs dark:bg-slate-950/50">
+                <span className="font-mono font-semibold text-slate-800 dark:text-slate-100">
+                  {effectiveRegisterPrefix}
+                </span>
+                <span className="text-slate-400">Locked</span>
+                {registerPreview ? (
+                  <span className="text-slate-400">· student IDs like {registerPreview}</span>
+                ) : null}
+              </div>
+            ) : (
+              <>
+                <Input
+                  id="edit-org-register"
+                  className="mt-1 font-mono uppercase"
+                  value={registrationPrefix}
+                  onChange={(e) => setRegistrationPrefix(normalizeRegisterPrefixInput(e.target.value))}
+                  placeholder="e.g. PEA"
+                  maxLength={24}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  Used for student/teacher IDs
+                  {registerPreview ? ` (e.g. ${registerPreview})` : ''}. Set once; then locked.
+                </p>
+              </>
+            )}
+          </div>
+
           <div className="rounded-xl border border-slate-200 px-3.5 py-3 dark:border-slate-700">
             <p className="ah-label">Point of contact</p>
             {pocLoading ? (
@@ -495,6 +559,7 @@ function CreateOrganizationModal({
   const [logoUploading, setLogoUploading] = useState(false);
   const [logoInputKey, setLogoInputKey] = useState(0);
   const [subdomainTouched, setSubdomainTouched] = useState(false);
+  const [registerPrefixTouched, setRegisterPrefixTouched] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -503,6 +568,7 @@ function CreateOrganizationModal({
       setLogoUploading(false);
       setLogoInputKey((key) => key + 1);
       setSubdomainTouched(false);
+      setRegisterPrefixTouched(false);
     }
   }, [open]);
 
@@ -511,6 +577,7 @@ function CreateOrganizationModal({
       const body: Record<string, unknown> = {
         name: form.name.trim(),
         subdomain: form.subdomain.trim().toLowerCase().replace(/[^a-z0-9-]/g, ''),
+        registrationPrefix: normalizeRegisterPrefixInput(form.registrationPrefix),
         isActive: form.isActive,
         features: form.features,
       };
@@ -542,6 +609,7 @@ function CreateOrganizationModal({
       setUploadedLogo(null);
       setLogoInputKey((key) => key + 1);
       setSubdomainTouched(false);
+      setRegisterPrefixTouched(false);
       onClose();
     },
     onError: (err: unknown) => {
@@ -558,8 +626,15 @@ function CreateOrganizationModal({
       ...f,
       name: value,
       subdomain: subdomainTouched ? f.subdomain : slugifySubdomain(value),
+      registrationPrefix: registerPrefixTouched
+        ? f.registrationPrefix
+        : suggestRegisterPrefix(value),
     }));
   };
+
+  const registerPreview = form.registrationPrefix
+    ? `${normalizeRegisterPrefixInput(form.registrationPrefix)}48291`
+    : null;
 
   return (
     <Modal
@@ -628,9 +703,36 @@ function CreateOrganizationModal({
               spellCheck={false}
             />
             <p className="mt-1 text-xs text-slate-500">
-              Database name: {form.subdomain || '—'}
+              Login URL / database: {form.subdomain || '—'}
             </p>
           </div>
+        </div>
+
+        <div>
+          <label htmlFor="create-org-register" className="ah-label">
+            Register ID string
+          </label>
+          <Input
+            id="create-org-register"
+            required
+            className="mt-1 font-mono uppercase"
+            value={form.registrationPrefix}
+            onChange={(e) => {
+              setRegisterPrefixTouched(true);
+              setForm((f) => ({
+                ...f,
+                registrationPrefix: normalizeRegisterPrefixInput(e.target.value),
+              }));
+            }}
+            placeholder="PEA"
+            maxLength={24}
+            autoComplete="off"
+            spellCheck={false}
+          />
+          <p className="mt-1 text-xs text-slate-500">
+            Prefix for student/teacher login IDs — e.g.{' '}
+            <span className="font-mono">{registerPreview || 'PEA48291'}</span>
+          </p>
         </div>
 
         <div>
@@ -1023,7 +1125,10 @@ export function ClientsPage() {
                         <div className="min-w-0">
                           <p className="truncate font-semibold text-slate-900 dark:text-white">{org.name}</p>
                           <p className="truncate text-xs text-slate-400">
-                            {org.tagline || `ID · ${org.id.slice(0, 8)}`}
+                            {org.tagline ||
+                              (org.registrationPrefix
+                                ? `IDs · ${org.registrationPrefix}#####`
+                                : `ID · ${org.id.slice(0, 8)}`)}
                           </p>
                         </div>
                       </div>

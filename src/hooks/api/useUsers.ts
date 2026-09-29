@@ -101,6 +101,61 @@ export function useUserMutations() {
     mutationFn: async (body: Record<string, unknown>) => (await api.post('/users/invite', body)).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
   });
+  const importMembers = useMutation({
+    mutationFn: async (body: {
+      mode: 'create' | 'invite';
+      students: { email: string; firstName?: string; lastName?: string; password?: string }[];
+    }) =>
+      (
+        await api.post<{
+          created: number;
+          skipped: number;
+          failed: number;
+          total: number;
+          mode: string;
+          results: {
+            row: number;
+            email: string;
+            ok: boolean;
+            skipped?: boolean;
+            error?: string;
+            registrationId?: string;
+            generatedPassword?: string;
+          }[];
+        }>('/users/members/import', body)
+      ).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['users'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+  const importSubordinates = useMutation({
+    mutationFn: async (body: {
+      teachers: { email: string; firstName?: string; lastName?: string; password?: string }[];
+    }) =>
+      (
+        await api.post<{
+          created: number;
+          skipped: number;
+          failed: number;
+          total: number;
+          results: {
+            row: number;
+            email: string;
+            ok: boolean;
+            skipped?: boolean;
+            error?: string;
+            registrationId?: string;
+            generatedPassword?: string;
+          }[];
+        }>('/users/subordinates/import', body)
+      ).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['subordinates'] });
+      qc.invalidateQueries({ queryKey: ['users'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
   const updateUser = useMutation({
     mutationFn: async ({ id, body }: { id: string; body: Record<string, unknown> }) =>
       (await api.patch(`/users/${id}`, body)).data as { user: UserListRow },
@@ -109,5 +164,5 @@ export function useUserMutations() {
       qc.invalidateQueries({ queryKey: ['subordinates'] });
     },
   });
-  return { createSubordinate, createMember, invite, updateUser };
+  return { createSubordinate, createMember, invite, importMembers, importSubordinates, updateUser };
 }

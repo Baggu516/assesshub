@@ -93,6 +93,14 @@ export function ClassesPage() {
                     {c.teachers.map((t) => t.label).join(', ')}
                   </p>
                 ) : null}
+                {c.classTeacher ? (
+                  <p className="mt-1 text-xs text-slate-500">
+                    <span className="font-medium text-slate-600 dark:text-slate-400">
+                      Class teacher:{' '}
+                    </span>
+                    {c.classTeacher.label}
+                  </p>
+                ) : null}
                 {c.students && c.students.length > 0 ? (
                   <p className="mt-1 text-xs text-slate-500">
                     <span className="font-medium text-slate-600 dark:text-slate-400">Students: </span>

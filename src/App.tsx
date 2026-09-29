@@ -16,6 +16,8 @@ import { AssessmentResultsPage } from './pages/AssessmentResultsPage';
 import { GroupStudentsPage } from './pages/GroupStudentsPage';
 import { ClassesPage } from './pages/ClassesPage';
 import { ClassWizardPage } from './pages/ClassWizardPage';
+import { MyClassPage } from './pages/MyClassPage';
+import { StudentPerformancePage } from './pages/StudentPerformancePage';
 import { AcademicYearsPage } from './pages/AcademicYearsPage';
 import { ClassMastersPage } from './pages/ClassMastersPage';
 import { PromotionsPage } from './pages/PromotionsPage';
@@ -200,6 +202,22 @@ export default function App() {
               <RequirePermission keys={[PERMISSIONS.ASSESSMENT_CREATE, PERMISSIONS.ONLINE_EXAM_CREATE]}>
                 <GroupStudentsPage />
               </RequirePermission>
+            </RequireHierarchy>
+          }
+        />
+        <Route
+          path="my-class"
+          element={
+            <RequireHierarchy roles={['subordinate']}>
+              <MyClassPage />
+            </RequireHierarchy>
+          }
+        />
+        <Route
+          path="my-class/:classId/students/:studentId"
+          element={
+            <RequireHierarchy roles={['subordinate']}>
+              <StudentPerformancePage />
             </RequireHierarchy>
           }
         />

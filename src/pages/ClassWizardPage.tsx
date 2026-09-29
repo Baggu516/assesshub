@@ -232,12 +232,19 @@ function MembersTable({
   onRemove,
   emptyTitle,
   emptyDescription,
+  classTeacherId,
+  onClassTeacherChange,
 }: {
   rows: ClassMemberRow[];
   onRemove: (id: string) => void;
   emptyTitle: string;
   emptyDescription: string;
+  /** When set, shows a Class teacher radio column */
+  classTeacherId?: string | null;
+  onClassTeacherChange?: (id: string | null) => void;
 }) {
+  const showClassTeacher = typeof onClassTeacherChange === 'function';
+
   if (rows.length === 0) {
     return (
       <EmptyState
@@ -255,14 +262,38 @@ function MembersTable({
           <tr>
             <th className="px-4 py-2.5 font-medium">Name</th>
             <th className="px-4 py-2.5 font-medium">Email</th>
+            {showClassTeacher ? (
+              <th className="px-4 py-2.5 font-medium">Class teacher</th>
+            ) : null}
             <th className="w-24 px-4 py-2.5 font-medium text-right">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
           {rows.map((m) => (
             <tr key={m.id} className="bg-white dark:bg-slate-950/40">
-              <td className="px-4 py-2.5 font-medium text-slate-900 dark:text-white">{m.label}</td>
+              <td className="px-4 py-2.5 font-medium text-slate-900 dark:text-white">
+                {m.label}
+                {showClassTeacher && classTeacherId === m.id ? (
+                  <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-brand-600 dark:text-brand-400">
+                    Homeroom
+                  </span>
+                ) : null}
+              </td>
               <td className="px-4 py-2.5 text-slate-500">{m.email}</td>
+              {showClassTeacher ? (
+                <td className="px-4 py-2.5">
+                  <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                    <input
+                      type="radio"
+                      name="class-teacher"
+                      checked={classTeacherId === m.id}
+                      onChange={() => onClassTeacherChange?.(m.id)}
+                      className="h-4 w-4 border-slate-300 text-brand-600 focus:ring-brand-500"
+                    />
+                    Select
+                  </label>
+                </td>
+              ) : null}
               <td className="px-4 py-2.5 text-right">
                 <button
                   type="button"
@@ -276,6 +307,17 @@ function MembersTable({
           ))}
         </tbody>
       </table>
+      {showClassTeacher && classTeacherId ? (
+        <div className="border-t border-slate-100 bg-slate-50 px-4 py-2 dark:border-slate-800 dark:bg-slate-900/50">
+          <button
+            type="button"
+            onClick={() => onClassTeacherChange?.(null)}
+            className="text-xs font-medium text-slate-500 hover:underline dark:text-slate-400"
+          >
+            Clear class teacher
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -304,6 +346,7 @@ export function ClassWizardPage() {
   const [description, setDescription] = useState('');
   const [studentIds, setStudentIds] = useState<string[]>([]);
   const [teacherIds, setTeacherIds] = useState<string[]>([]);
+  const [classTeacherId, setClassTeacherId] = useState<string | null>(null);
   const [pickStudentsOpen, setPickStudentsOpen] = useState(false);
   const [pickTeachersOpen, setPickTeachersOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -323,6 +366,7 @@ export function ClassWizardPage() {
     setDescription(existing.description || '');
     setStudentIds((existing.students || []).map((s) => s.id));
     setTeacherIds((existing.teachers || []).map((t) => t.id));
+    setClassTeacherId(existing.classTeacherId || null);
     setHydrated(true);
   }, [isEdit, existing, hydrated]);
 
@@ -362,6 +406,11 @@ export function ClassWizardPage() {
     setTeacherIds((prev) => [...new Set([...prev, ...ids])]);
   };
 
+  const removeTeacher = (id: string) => {
+    setTeacherIds((prev) => prev.filter((x) => x !== id));
+    setClassTeacherId((prev) => (prev === id ? null : prev));
+  };
+
   const handleFinish = async () => {
     if (!canContinueDetails || saving) return;
     try {
@@ -374,6 +423,7 @@ export function ClassWizardPage() {
           description: description.trim(),
           teacherIds,
           studentIds,
+          classTeacherId,
         });
         toast.success('Class updated');
       } else {
@@ -384,6 +434,7 @@ export function ClassWizardPage() {
           description: description.trim(),
           teacherIds,
           studentIds,
+          classTeacherId,
         });
         toast.success('Class created');
       }
@@ -542,7 +593,7 @@ export function ClassWizardPage() {
             <div>
               <h2 className="text-base font-semibold text-slate-900 dark:text-white">Teachers</h2>
               <p className="mt-0.5 text-sm text-slate-500">
-                {selectedTeachers.length} selected · optional, you can add later
+                {selectedTeachers.length} selected · pick one class teacher (optional)
               </p>
             </div>
             <Button type="button" onClick={() => setPickTeachersOpen(true)}>
@@ -552,7 +603,9 @@ export function ClassWizardPage() {
 
           <MembersTable
             rows={selectedTeachers}
-            onRemove={(id) => setTeacherIds((prev) => prev.filter((x) => x !== id))}
+            onRemove={removeTeacher}
+            classTeacherId={classTeacherId}
+            onClassTeacherChange={setClassTeacherId}
             emptyTitle="No teachers yet"
             emptyDescription="Click Add teachers to assign teachers to this class."
           />
@@ -564,6 +617,14 @@ export function ClassWizardPage() {
             {' · '}
             <Badge tone="info">{selectedStudents.length} students</Badge>{' '}
             <Badge tone="info">{selectedTeachers.length} teachers</Badge>
+            {classTeacherId && teacherById.get(classTeacherId) ? (
+              <>
+                {' '}
+                <Badge tone="success">
+                  Class teacher: {teacherById.get(classTeacherId)!.label}
+                </Badge>
+              </>
+            ) : null}
           </div>
 
           <div className="flex justify-between gap-2 pt-2">

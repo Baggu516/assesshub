@@ -1,4 +1,4 @@
-import { useMemo, useState, type Dispatch, type FormEvent, type SetStateAction } from 'react';
+import { useMemo, useRef, useState, type Dispatch, type FormEvent, type SetStateAction } from 'react';
 import toast from 'react-hot-toast';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -12,6 +12,11 @@ import { useAuth } from '@/context/AuthContext';
 import { PERMISSIONS } from '@/constants/permissions';
 import { formatPermissionList, permissionVisibleFor } from '@/constants/permissionLabels';
 import { resolveOrgFeatures } from '@/lib/sessionCache';
+import {
+  downloadTeacherImportTemplate,
+  parseTeacherImportCsv,
+  type PersonImportRow,
+} from '@/lib/csv';
 import { useTenantOrganization } from '@/hooks/api/useTenant';
 import {
   usePermissionsCatalogQuery,
@@ -20,6 +25,277 @@ import {
   type UserListRow,
 } from '@/hooks/api/useUsers';
 import { isValidEmail } from '@/lib/validation';
+
+type ImportResultRow = {
+  row: number;
+  email: string;
+  ok: boolean;
+  skipped?: boolean;
+  error?: string;
+  registrationId?: string;
+  generatedPassword?: string;
+};
+
+function ImportTeachersModal({
+  open,
+  onClose,
+  importing,
+  onImport,
+}: {
+  open: boolean;
+  onClose: () => void;
+  importing: boolean;
+  onImport: (teachers: { email: string; firstName?: string; lastName?: string; password?: string }[]) => Promise<
+    ImportResultRow[] | null
+  >;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [rows, setRows] = useState<PersonImportRow[]>([]);
+  const [parseError, setParseError] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [results, setResults] = useState<ImportResultRow[] | null>(null);
+
+  const reset = () => {
+    setRows([]);
+    setParseError(null);
+    setFileName(null);
+    setResults(null);
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
+  const handleClose = () => {
+    if (importing) return;
+    reset();
+    onClose();
+  };
+
+  const onFile = async (file: File | null) => {
+    setResults(null);
+    setParseError(null);
+    setRows([]);
+    setFileName(null);
+    if (!file) return;
+    if (!/\.csv$/i.test(file.name) && file.type && !file.type.includes('csv') && file.type !== 'text/plain') {
+      setParseError('Please upload a .csv file');
+      return;
+    }
+    try {
+      const text = await file.text();
+      const parsed = parseTeacherImportCsv(text);
+      if (parsed.error) {
+        setParseError(parsed.error);
+        return;
+      }
+      setFileName(file.name);
+      setRows(parsed.rows);
+    } catch {
+      setParseError('Could not read file');
+    }
+  };
+
+  const preview = useMemo(() => {
+    const seen = new Set<string>();
+    let dupInFile = 0;
+    let validUnique = 0;
+    for (const r of rows) {
+      const email = r.email.trim().toLowerCase();
+      if (!email || !isValidEmail(email)) continue;
+      if (seen.has(email)) {
+        dupInFile += 1;
+        continue;
+      }
+      seen.add(email);
+      if (r.password.trim() && r.password.trim().length < 8) continue;
+      validUnique += 1;
+    }
+    return { dupInFile, validUnique };
+  }, [rows]);
+
+  const canSubmit = rows.length > 0 && preview.validUnique > 0 && !importing && !results;
+
+  const handleImport = async () => {
+    if (!canSubmit) return;
+    const teachers = rows.map((r) => ({
+      email: r.email.trim(),
+      firstName: r.firstName.trim() || undefined,
+      lastName: r.lastName.trim() || undefined,
+      ...(r.password.trim() ? { password: r.password.trim() } : {}),
+    }));
+    const res = await onImport(teachers);
+    if (res) setResults(res);
+  };
+
+  const createdCount = results?.filter((r) => r.ok).length ?? 0;
+  const skippedCount = results?.filter((r) => !r.ok && r.skipped).length ?? 0;
+  const failedCount = results?.filter((r) => !r.ok && !r.skipped).length ?? 0;
+
+  return (
+    <Modal
+      open={open}
+      onClose={handleClose}
+      size="lg"
+      title="Import teachers"
+      description="Upload a CSV to create many teacher accounts at once."
+      footer={
+        <>
+          <Button variant="secondary" onClick={handleClose} disabled={importing}>
+            {results ? 'Close' : 'Cancel'}
+          </Button>
+          {!results ? (
+            <Button onClick={handleImport} disabled={!canSubmit}>
+              {importing
+                ? 'Importing…'
+                : `Create ${preview.validUnique || ''} teacher${preview.validUnique === 1 ? '' : 's'}`.trim()}
+            </Button>
+          ) : null}
+        </>
+      }
+    >
+      <div className="space-y-4">
+        {!results ? (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => downloadTeacherImportTemplate()}
+                disabled={importing}
+              >
+                Download template
+              </Button>
+              <span className="text-xs text-slate-500">
+                Columns: email, firstName, lastName, password (optional)
+              </span>
+            </div>
+            <p className="text-xs text-slate-500">
+              Blank password cells get an auto-generated password emailed to the teacher.
+            </p>
+
+            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50/80 px-4 py-5 text-center dark:border-slate-600 dark:bg-slate-900/40">
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                disabled={importing}
+                onChange={(e) => onFile(e.target.files?.[0] ?? null)}
+              />
+              <Button type="button" variant="secondary" disabled={importing} onClick={() => fileRef.current?.click()}>
+                Choose CSV file
+              </Button>
+              {fileName ? (
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                  {fileName} · {rows.length} teacher{rows.length === 1 ? '' : 's'}
+                </p>
+              ) : (
+                <p className="mt-2 text-xs text-slate-500">Max 200 rows per import</p>
+              )}
+            </div>
+
+            {parseError ? <p className="text-sm text-rose-600 dark:text-rose-400">{parseError}</p> : null}
+            {preview.dupInFile > 0 ? (
+              <p className="text-sm text-slate-500">
+                {preview.dupInFile} duplicate row{preview.dupInFile === 1 ? '' : 's'} in file will be skipped.
+                Existing teachers are also skipped automatically.
+              </p>
+            ) : rows.length > 0 ? (
+              <p className="text-xs text-slate-500">
+                Teachers who already exist are skipped; the rest will still be imported.
+              </p>
+            ) : null}
+
+            {rows.length > 0 && (
+              <div className="max-h-48 overflow-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                <table className="w-full text-left text-xs">
+                  <thead className="sticky top-0 bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                    <tr>
+                      <th className="px-2 py-1.5 font-medium">#</th>
+                      <th className="px-2 py-1.5 font-medium">Email</th>
+                      <th className="px-2 py-1.5 font-medium">Name</th>
+                      <th className="px-2 py-1.5 font-medium">Password</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.slice(0, 50).map((r, i) => (
+                      <tr key={`${r.email}-${i}`} className="border-t border-slate-100 dark:border-slate-800">
+                        <td className="px-2 py-1 tabular-nums text-slate-400">{i + 1}</td>
+                        <td className="px-2 py-1 font-mono text-slate-700 dark:text-slate-300">{r.email}</td>
+                        <td className="px-2 py-1 text-slate-700 dark:text-slate-300">
+                          {[r.firstName, r.lastName].filter(Boolean).join(' ') || '—'}
+                        </td>
+                        <td className="px-2 py-1 text-slate-500">{r.password.trim() ? '••••••••' : 'auto'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {rows.length > 50 ? (
+                  <p className="border-t border-slate-100 px-2 py-1.5 text-[11px] text-slate-400 dark:border-slate-800">
+                    Showing first 50 of {rows.length}
+                  </p>
+                ) : null}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-slate-700 dark:text-slate-200">
+              Import finished:{' '}
+              <span className="font-medium text-emerald-700 dark:text-emerald-400">{createdCount} created</span>
+              {skippedCount > 0 ? (
+                <>
+                  {' · '}
+                  <span className="font-medium text-amber-700 dark:text-amber-400">{skippedCount} skipped</span>
+                </>
+              ) : null}
+              {failedCount > 0 ? (
+                <>
+                  {' · '}
+                  <span className="font-medium text-rose-600 dark:text-rose-400">{failedCount} failed</span>
+                </>
+              ) : null}
+            </p>
+            <div className="max-h-64 overflow-auto rounded-lg border border-slate-200 dark:border-slate-700">
+              <table className="w-full text-left text-xs">
+                <thead className="sticky top-0 bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                  <tr>
+                    <th className="px-2 py-1.5 font-medium">Row</th>
+                    <th className="px-2 py-1.5 font-medium">Email</th>
+                    <th className="px-2 py-1.5 font-medium">Status</th>
+                    <th className="px-2 py-1.5 font-medium">Detail</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {results.map((r) => (
+                    <tr key={`${r.row}-${r.email}`} className="border-t border-slate-100 dark:border-slate-800">
+                      <td className="px-2 py-1 tabular-nums text-slate-400">{r.row}</td>
+                      <td className="px-2 py-1 font-mono text-slate-700 dark:text-slate-300">{r.email || '—'}</td>
+                      <td className="px-2 py-1">
+                        <Badge tone={r.ok ? 'success' : r.skipped ? 'warning' : 'danger'}>
+                          {r.ok ? 'OK' : r.skipped ? 'Skipped' : 'Failed'}
+                        </Badge>
+                      </td>
+                      <td className="px-2 py-1 text-slate-600 dark:text-slate-400">
+                        {r.ok
+                          ? [r.registrationId ? `ID ${r.registrationId}` : null, r.generatedPassword ? `pw ${r.generatedPassword}` : null]
+                              .filter(Boolean)
+                              .join(' · ') || 'Created'
+                          : r.error || 'Failed'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Button type="button" variant="secondary" size="sm" onClick={() => reset()}>
+              Import another file
+            </Button>
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
 
 function InviteSubordinateModal({
   open,
@@ -272,10 +548,11 @@ export function SubordinatesPage() {
   const features = resolveOrgFeatures(org);
   const [search, setSearch] = useState('');
   const { data, isLoading, refetch } = useSubordinatesQuery(true, user?.id);
-  const { createSubordinate, updateUser } = useUserMutations();
+  const { createSubordinate, importSubordinates, updateUser } = useUserMutations();
   const { data: catalog, isLoading: catalogLoading } = usePermissionsCatalogQuery();
   const [editTarget, setEditTarget] = useState<UserListRow | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const [form, setForm] = useState({
     email: '',
@@ -285,6 +562,11 @@ export function SubordinatesPage() {
   });
 
   const myPerms = user?.permissions as string[] | undefined;
+
+  const canCreateTeachers =
+    !!user &&
+    user.hierarchyRole === 'admin' &&
+    !!myPerms?.includes(PERMISSIONS.SUBORDINATE_CREATE);
 
   const canOpenEdit =
     !!user &&
@@ -373,9 +655,39 @@ export function SubordinatesPage() {
     }
   };
 
+  const runImport = async (
+    teachers: { email: string; firstName?: string; lastName?: string; password?: string }[]
+  ) => {
+    try {
+      const data = await importSubordinates.mutateAsync({ teachers });
+      const skipped = data.skipped ?? 0;
+      if (data.failed === 0 && data.created > 0) {
+        toast.success(
+          skipped > 0
+            ? `Created ${data.created}, skipped ${skipped} existing`
+            : `Created ${data.created} teacher${data.created === 1 ? '' : 's'}`
+        );
+      } else if (data.created === 0 && data.failed === 0 && skipped > 0) {
+        toast.success(`All ${skipped} already existed — skipped`);
+      } else if (data.created === 0 && data.failed > 0) {
+        toast.error(`Import failed for ${data.failed} row${data.failed === 1 ? '' : 's'}`);
+      } else {
+        toast.success(
+          `Created ${data.created}${skipped ? `, skipped ${skipped}` : ''}${data.failed ? `, ${data.failed} failed` : ''}`
+        );
+      }
+      refetch();
+      return data.results;
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg || 'Import failed');
+      return null;
+    }
+  };
+
   return (
     <div className="ah-page">
-      {canOpenEdit && (
+      {canCreateTeachers && (
         <InviteSubordinateModal
           open={inviteOpen}
           form={form}
@@ -387,6 +699,18 @@ export function SubordinatesPage() {
             setInviteOpen(false);
           }}
           onSubmit={onSubmitInvite}
+        />
+      )}
+
+      {canCreateTeachers && (
+        <ImportTeachersModal
+          open={importOpen}
+          importing={importSubordinates.isPending}
+          onClose={() => {
+            if (importSubordinates.isPending) return;
+            setImportOpen(false);
+          }}
+          onImport={runImport}
         />
       )}
 
@@ -410,15 +734,20 @@ export function SubordinatesPage() {
       <PageHeader
         eyebrow="Team"
         title="Teachers"
-        description="Team leads reporting to the administrator."
+        description="Create or import teachers, then assign them to classes."
         actions={
-          canOpenEdit ? (
-            <Button onClick={() => setInviteOpen(true)}>
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-              Add teacher
-            </Button>
+          canCreateTeachers ? (
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={() => setImportOpen(true)}>
+                Import CSV
+              </Button>
+              <Button onClick={() => setInviteOpen(true)}>
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                Add teacher
+              </Button>
+            </div>
           ) : undefined
         }
       />
@@ -468,10 +797,15 @@ export function SubordinatesPage() {
           ) : !data?.length ? (
             <EmptyState
               title="No teachers yet"
-              description="Add a team lead to get started."
+              description="Add or import teachers to get started."
               action={
-                canOpenEdit ? (
-                  <Button onClick={() => setInviteOpen(true)}>Add teacher</Button>
+                canCreateTeachers ? (
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <Button variant="secondary" onClick={() => setImportOpen(true)}>
+                      Import CSV
+                    </Button>
+                    <Button onClick={() => setInviteOpen(true)}>Add teacher</Button>
+                  </div>
                 ) : undefined
               }
             />
