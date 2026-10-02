@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import { JoinQuizModal, QuizCodeModal } from '@/components/quiz/QuizJoin';
 import { Badge, Button, Card, EmptyState, FormField, Input, Modal, PageHeader, Skeleton } from '@/components/ui';
@@ -21,6 +22,41 @@ type DraftQuestion = {
 
 function blankQuestion(choiceCount: number): DraftQuestion {
   return { prompt: '', options: Array.from({ length: choiceCount }, () => ''), correct: 0 };
+}
+
+function Segment<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: { id: T; label: string }[];
+  onChange: (next: T) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm text-slate-500">{label}</p>
+      <div className="grid grid-cols-2 rounded-full bg-slate-100 p-1 dark:bg-slate-800">
+        {options.map((option) => (
+          <button
+            key={option.id}
+            type="button"
+            onClick={() => onChange(option.id)}
+            className={clsx(
+              'rounded-full px-3 py-1.5 text-sm font-medium transition',
+              value === option.id
+                ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-950 dark:text-white'
+                : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+            )}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function resizeOptions(options: string[], count: number) {
@@ -49,6 +85,8 @@ export function QuizzesPage() {
   const [title, setTitle] = useState('');
   const [minutes, setMinutes] = useState('10');
   const [choiceCount, setChoiceCount] = useState(4);
+  const [quizShuffle, setQuizShuffle] = useState<'options' | 'questions'>('options');
+  const [revealAnswers, setRevealAnswers] = useState(false);
   const [questions, setQuestions] = useState<DraftQuestion[]>([blankQuestion(4)]);
   const [codeQuiz, setCodeQuiz] = useState<Assessment | null>(null);
 
@@ -109,6 +147,8 @@ export function QuizzesPage() {
         kind: 'quiz',
         title: title.trim(),
         durationMinutes,
+        quizShuffle,
+        revealAnswers,
         questions: built.map(({ optionCount: _count, correct: _correct, ...question }) => question),
       });
       const launched = await publish.mutateAsync(created.id);
@@ -116,6 +156,8 @@ export function QuizzesPage() {
       setTitle('');
       setMinutes('10');
       setChoiceCount(4);
+      setQuizShuffle('options');
+      setRevealAnswers(false);
       setQuestions([blankQuestion(4)]);
       setCodeQuiz(launched);
     } catch (err: unknown) {
@@ -237,7 +279,7 @@ export function QuizzesPage() {
           if (!saving) setEditorOpen(false);
         }}
         title="New quiz"
-        description="Add the questions, then launch. Students join with a code or QR."
+        description="A title, a few choices, then launch."
         size="lg"
         footer={
           <>
@@ -250,11 +292,12 @@ export function QuizzesPage() {
           </>
         }
       >
-        <div className="space-y-4">
+        <div className="space-y-6">
           <FormField label="Title" htmlFor="quiz-title" required>
-            <Input id="quiz-title" value={title} onChange={(e) => setTitle(e.target.value)} />
+            <Input id="quiz-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Friday quiz" />
           </FormField>
-          <div className="grid gap-3 sm:grid-cols-2">
+
+          <div className="grid grid-cols-2 gap-3">
             <FormField label="Minutes" htmlFor="quiz-minutes">
               <Input
                 id="quiz-minutes"
@@ -265,7 +308,7 @@ export function QuizzesPage() {
                 onChange={(e) => setMinutes(e.target.value)}
               />
             </FormField>
-            <FormField label="Choices per question" htmlFor="quiz-choices">
+            <FormField label="Choices" htmlFor="quiz-choices">
               <Input
                 id="quiz-choices"
                 type="number"
@@ -286,40 +329,100 @@ export function QuizzesPage() {
               />
             </FormField>
           </div>
-          {questions.map((question, index) => (
-            <div key={index} className="space-y-2 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
-              <FormField label={`Question ${index + 1}`} htmlFor={`quiz-q-${index}`}>
+
+          <div className="space-y-3 rounded-2xl bg-slate-50 p-3 dark:bg-slate-950/40">
+            <Segment
+              label="Question order"
+              value={quizShuffle}
+              onChange={setQuizShuffle}
+              options={[
+                { id: 'options', label: 'Same' },
+                { id: 'questions', label: 'Mixed' },
+              ]}
+            />
+            <Segment
+              label="After an answer"
+              value={revealAnswers ? 'reveal' : 'hide'}
+              onChange={(next) => setRevealAnswers(next === 'reveal')}
+              options={[
+                { id: 'hide', label: 'Hide' },
+                { id: 'reveal', label: 'Reveal' },
+              ]}
+            />
+            <p className="text-xs leading-relaxed text-slate-400">
+              {quizShuffle === 'options'
+                ? 'Same question order. Choices are mixed for each student.'
+                : 'Questions and choices are both mixed for each student.'}{' '}
+              {revealAnswers
+                ? 'Correct or wrong shows before Next.'
+                : 'The next question opens immediately.'}
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {questions.map((question, index) => (
+              <div key={index} className="rounded-2xl border border-slate-200 p-3 dark:border-slate-800">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Question {index + 1}</p>
+                  {questions.length > 1 ? (
+                    <button
+                      type="button"
+                      className="text-xs text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                      onClick={() => setQuestions((rows) => rows.filter((_, i) => i !== index))}
+                    >
+                      Remove
+                    </button>
+                  ) : null}
+                </div>
                 <Input
                   id={`quiz-q-${index}`}
                   value={question.prompt}
+                  placeholder="Write the question"
+                  aria-label={`Question ${index + 1}`}
                   onChange={(e) => updateQuestion(index, { prompt: e.target.value })}
                 />
-              </FormField>
-              {question.options.map((option, optionIndex) => (
-                <label key={optionIndex} className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name={`correct-${index}`}
-                    checked={question.correct === optionIndex}
-                    onChange={() => updateQuestion(index, { correct: optionIndex })}
-                    aria-label={`Correct choice ${optionIndex + 1}`}
-                  />
-                  <Input
-                    value={option}
-                    placeholder={`Choice ${optionIndex + 1}`}
-                    onChange={(e) => {
-                      const options = [...question.options];
-                      options[optionIndex] = e.target.value;
-                      updateQuestion(index, { options });
-                    }}
-                  />
-                </label>
-              ))}
-            </div>
-          ))}
-          <Button variant="secondary" onClick={() => setQuestions((rows) => [...rows, blankQuestion(choiceCount)])}>
-            Add question
-          </Button>
+                <div className="mt-2 space-y-2">
+                  {question.options.map((option, optionIndex) => {
+                    const marked = question.correct === optionIndex;
+                    return (
+                      <div key={optionIndex} className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          aria-label={`Mark choice ${optionIndex + 1} correct`}
+                          aria-pressed={marked}
+                          onClick={() => updateQuestion(index, { correct: optionIndex })}
+                          className={clsx(
+                            'grid h-5 w-5 shrink-0 place-items-center rounded-full border transition',
+                            marked
+                              ? 'border-brand-600 bg-brand-600 text-white'
+                              : 'border-slate-300 text-transparent hover:border-brand-400 dark:border-slate-600'
+                          )}
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                        </button>
+                        <Input
+                          value={option}
+                          placeholder={`Choice ${optionIndex + 1}`}
+                          onChange={(e) => {
+                            const options = [...question.options];
+                            options[optionIndex] = e.target.value;
+                            updateQuestion(index, { options });
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => setQuestions((rows) => [...rows, blankQuestion(choiceCount)])}
+              className="text-sm font-medium text-brand-700 hover:text-brand-800 dark:text-brand-300"
+            >
+              + Add question
+            </button>
+          </div>
         </div>
       </Modal>
 

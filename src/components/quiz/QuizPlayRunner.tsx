@@ -23,10 +23,17 @@ function formatClock(totalSeconds: number) {
   return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
 }
 
+type RevealState = {
+  questionId: string;
+  isCorrect: boolean;
+  correctOptionId: string;
+};
+
 export function QuizPlayRunner({
   title,
   questions,
   assignmentId,
+  revealAnswers = false,
   initialRemainingSeconds,
   submitting,
   onSubmit,
@@ -34,6 +41,7 @@ export function QuizPlayRunner({
   title: string;
   questions: AssessmentQuestion[];
   assignmentId?: string;
+  revealAnswers?: boolean;
   initialRemainingSeconds: number | null;
   submitting: boolean;
   onSubmit: (
@@ -45,6 +53,7 @@ export function QuizPlayRunner({
   const [answers, setAnswers] = useState<Record<string, AnswerState>>({});
   const [index, setIndex] = useState(0);
   const [locked, setLocked] = useState(false);
+  const [revealed, setRevealed] = useState<RevealState | null>(null);
   const [remaining, setRemaining] = useState(
     initialRemainingSeconds == null ? null : Math.max(0, initialRemainingSeconds)
   );
@@ -91,17 +100,43 @@ export function QuizPlayRunner({
       selectedOptionIds: nextAnswers[q.id || '']?.selectedOptionIds || [],
       textAnswer: '',
     }));
-    const saved = assignmentId ? saveQuizProgress(assignmentId, body).catch(() => undefined) : Promise.resolve();
-    void saved.then(() => {
-      window.setTimeout(() => {
-        if (index >= total - 1) {
-          void finish('manual', nextAnswers);
-          return;
-        }
-        setIndex((current) => current + 1);
+    const saved = assignmentId
+      ? saveQuizProgress(assignmentId, body).catch(() => undefined)
+      : Promise.resolve(undefined);
+
+    if (!revealAnswers) {
+      void saved.then(() => {
+        window.setTimeout(() => {
+          if (index >= total - 1) {
+            void finish('manual', nextAnswers);
+            return;
+          }
+          setIndex((current) => current + 1);
+          setLocked(false);
+        }, 420);
+      });
+      return;
+    }
+
+    void saved.then((result) => {
+      const mark = result?.reveal?.find((item) => item.questionId === questionId);
+      if (!mark) {
         setLocked(false);
-      }, 420);
+        return;
+      }
+      setRevealed(mark);
     });
+  };
+
+  const goNext = () => {
+    if (!revealed || submitting) return;
+    if (index >= total - 1) {
+      void finish('manual');
+      return;
+    }
+    setRevealed(null);
+    setIndex((current) => current + 1);
+    setLocked(false);
   };
 
   if (!question) return null;
@@ -141,6 +176,9 @@ export function QuizPlayRunner({
         <div className="mt-8 grid gap-3 sm:grid-cols-2">
           {(question.options || []).map((option, optionIndex) => {
             const selected = answers[question.id || '']?.selectedOptionIds.includes(option.id || '');
+            const showing = revealed?.questionId === (question.id || '');
+            const isRight = showing && option.id === revealed.correctOptionId;
+            const isWrongPick = showing && selected && !revealed.isCorrect;
             return (
               <button
                 key={option.id || optionIndex}
@@ -148,18 +186,44 @@ export function QuizPlayRunner({
                 disabled={locked || submitting}
                 onClick={() => option.id && choose(option.id)}
                 className={clsx(
-                  'rounded-2xl px-5 py-5 text-left text-lg font-semibold text-white shadow-md transition disabled:cursor-default',
-                  CHOICE_STYLES[optionIndex % CHOICE_STYLES.length],
-                  selected && 'ring-4 ring-white ring-offset-2 ring-offset-slate-100 dark:ring-offset-slate-950'
+                  'relative rounded-2xl px-5 py-5 text-left text-lg font-semibold text-white shadow-md transition disabled:cursor-default',
+                  !showing && CHOICE_STYLES[optionIndex % CHOICE_STYLES.length],
+                  !showing && selected && 'ring-4 ring-white ring-offset-2 ring-offset-slate-100 dark:ring-offset-slate-950',
+                  isRight && 'quiz-pop bg-emerald-500 ring-4 ring-emerald-200',
+                  isWrongPick && 'quiz-shake bg-rose-600 ring-4 ring-rose-200',
+                  showing && !isRight && !isWrongPick && 'bg-slate-300 text-slate-500'
                 )}
               >
-                {option.text}
+                <span className="flex items-center justify-between gap-3">
+                  <span>{option.text}</span>
+                  {isRight ? <span aria-label="Correct">✓</span> : null}
+                  {isWrongPick ? <span aria-label="Wrong">✕</span> : null}
+                </span>
               </button>
             );
           })}
         </div>
+        {revealAnswers && revealed ? (
+          <div className="mt-6 flex flex-col items-center gap-3">
+            <p className={clsx('text-sm font-semibold', revealed.isCorrect ? 'text-emerald-600' : 'text-rose-600')}>
+              {revealed.isCorrect ? 'Correct' : 'Not quite'}
+            </p>
+            <button
+              type="button"
+              onClick={goNext}
+              disabled={submitting}
+              className="rounded-full bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white disabled:opacity-60 dark:bg-white dark:text-slate-900"
+            >
+              {index >= total - 1 ? 'Finish' : 'Next'}
+            </button>
+          </div>
+        ) : null}
       </div>
-      <p className="mt-6 text-center text-xs text-slate-400">Your choice moves you to the next question.</p>
+      <p className="mt-6 text-center text-xs text-slate-400">
+        {revealAnswers
+          ? 'After you answer, the result shows here. Next unlocks once you see it.'
+          : 'Your choice moves you to the next question.'}
+      </p>
     </div>
   );
 }

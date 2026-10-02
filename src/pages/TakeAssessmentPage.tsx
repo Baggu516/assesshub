@@ -166,6 +166,7 @@ export function TakeAssessmentPage({ kind = 'assessment' }: { kind?: ExamKind })
           <QuizPlayRunner
             title={assessment.title}
             assignmentId={assignment.id}
+            revealAnswers={assessment.revealAnswers === true}
             questions={assessment.questions}
             initialRemainingSeconds={
               assignment.remainingSeconds === undefined ? null : assignment.remainingSeconds

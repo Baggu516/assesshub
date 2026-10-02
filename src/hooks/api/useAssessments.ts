@@ -41,6 +41,7 @@ export interface Assessment {
   joinCode?: string | null;
   resultsReleased?: boolean;
   resultsReleasedAt?: string | null;
+  revealAnswers?: boolean;
   createdBy: string | null;
   questions: AssessmentQuestion[];
   questionCount?: number;
@@ -127,6 +128,8 @@ export type AssessmentPayload = {
   allowPartialCredit?: boolean;
   showAnswersAfterSubmit?: boolean;
   cameraMonitor?: boolean;
+  quizShuffle?: 'options' | 'questions';
+  revealAnswers?: boolean;
   sections?: string[];
   questions: AssessmentQuestion[];
   kind?: ExamKind;
@@ -222,7 +225,11 @@ export async function saveQuizProgress(
   assignmentId: string,
   answers: { questionId: string; selectedOptionIds: string[]; textAnswer: string }[]
 ) {
-  await api.post(`/assessments/assignments/${assignmentId}/progress`, { answers });
+  const { data } = await api.post<{
+    ok: boolean;
+    reveal?: { questionId: string; isCorrect: boolean; correctOptionId: string }[];
+  }>(`/assessments/assignments/${assignmentId}/progress`, { answers });
+  return data;
 }
 
 export function useJoinQuiz() {
