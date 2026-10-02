@@ -22,7 +22,7 @@ export interface AssessmentQuestion {
   caseSensitive?: boolean;
 }
 
-export type ExamKind = 'assessment' | 'online_exam';
+export type ExamKind = 'assessment' | 'online_exam' | 'quiz';
 
 export interface Assessment {
   id: string;
@@ -38,6 +38,7 @@ export interface Assessment {
   cameraMonitor?: boolean;
   sections?: string[];
   status: 'draft' | 'published' | 'closed';
+  joinCode?: string | null;
   resultsReleased?: boolean;
   resultsReleasedAt?: string | null;
   createdBy: string | null;
@@ -131,9 +132,13 @@ export type AssessmentPayload = {
   kind?: ExamKind;
 };
 
-export function useAssessmentsQuery(params?: { status?: string; page?: number; kind?: ExamKind }) {
+export function useAssessmentsQuery(
+  params?: { status?: string; page?: number; kind?: ExamKind },
+  enabled = true
+) {
   return useQuery({
     queryKey: ['assessments', 'list', params ?? {}],
+    enabled,
     queryFn: async () => {
       const { data } = await api.get<{ assessments: Assessment[]; total: number }>('/assessments', {
         params,
@@ -166,9 +171,10 @@ export function useAssessmentAssigneesQuery(enabled = true) {
 }
 
 /** academicYearId: specific id, "all", or omit for current year */
-export function useMyAssignmentsQuery(academicYearId?: string, kind?: ExamKind) {
+export function useMyAssignmentsQuery(academicYearId?: string, kind?: ExamKind, enabled = true) {
   return useQuery({
     queryKey: ['assessments', 'assignments', 'my', academicYearId ?? 'current', kind ?? 'all'],
+    enabled,
     queryFn: async () => {
       const { data } = await api.get<{
         assignments: AssessmentAssignment[];
@@ -180,6 +186,54 @@ export function useMyAssignmentsQuery(academicYearId?: string, kind?: ExamKind) 
         },
       });
       return data;
+    },
+  });
+}
+
+export type QuizPlayer = {
+  id: string;
+  name: string;
+  score: number;
+  maxScore: number;
+  answered: number;
+  questionCount: number;
+  onQuestion: number;
+  questionTitle: string;
+  status: 'finished' | 'playing' | 'joined';
+};
+
+export function useQuizLiveQuery(quizId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ['quizzes', quizId, 'live'],
+    enabled: Boolean(quizId) && enabled,
+    refetchInterval: 1500,
+    queryFn: async () => {
+      const { data } = await api.get<{
+        questionCount: number;
+        maxScore: number;
+        players: QuizPlayer[];
+      }>(`/assessments/${quizId}/live`);
+      return data;
+    },
+  });
+}
+
+export async function saveQuizProgress(
+  assignmentId: string,
+  answers: { questionId: string; selectedOptionIds: string[]; textAnswer: string }[]
+) {
+  await api.post(`/assessments/assignments/${assignmentId}/progress`, { answers });
+}
+
+export function useJoinQuiz() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (code: string) => {
+      const { data } = await api.post<{ assignment: AssessmentAssignment }>('/assessments/join', { code });
+      return data.assignment;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['assessments', 'assignments', 'my'] });
     },
   });
 }
@@ -198,11 +252,21 @@ export async function recordFullscreenExit(assignmentId: string) {
   return data;
 }
 
-export function useAssignmentQuery(assignmentId: string | undefined, options?: { preview?: boolean }) {
+export function useAssignmentQuery(
+  assignmentId: string | undefined,
+  options?: { preview?: boolean; pollUntilVisible?: boolean }
+) {
   const preview = Boolean(options?.preview);
+  const pollUntilVisible = Boolean(options?.pollUntilVisible);
   return useQuery({
     queryKey: ['assessments', 'assignments', assignmentId, preview ? 'preview' : 'live'],
     enabled: Boolean(assignmentId),
+    refetchInterval: (query) => {
+      if (!pollUntilVisible) return false;
+      const current = query.state.data;
+      if (current?.assignment.status === 'submitted' && !current.assignment.resultsVisible) return 2500;
+      return false;
+    },
     placeholderData: (previous) => {
       if (!previous || previous.assignment.id !== assignmentId) return undefined;
       return previous;

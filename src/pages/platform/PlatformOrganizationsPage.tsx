@@ -41,6 +41,7 @@ const defaultFeatures: OrgFeatures = {
   aiAssessmentCreate: false,
   worksheets: false,
   assessments: false,
+  quizzes: false,
   onlineExams: false,
 };
 
@@ -72,6 +73,7 @@ function PlanPicker({
     { key: 'aiAssessmentCreate', title: 'AI for assessments and online exams' },
     { key: 'worksheets', title: 'Worksheets' },
     { key: 'assessments', title: 'Assessments' },
+    { key: 'quizzes', title: 'Quizzes' },
     { key: 'onlineExams', title: 'Online exams' },
   ];
 
@@ -115,6 +117,7 @@ function subscriptionSummary(org: PlatformOrg) {
   if (features.aiAssessmentCreate) extras.push('AI create');
   if (features.worksheets) extras.push('Worksheets');
   if (features.assessments) extras.push('Assessments');
+  if (features.quizzes) extras.push('Quizzes');
   if (features.onlineExams) extras.push('Online exams');
   if (!extras.length) return { label: 'None', tone: 'neutral' as const };
   if (extras.length > 2) return { label: `${extras.length} features`, tone: 'brand' as const };

@@ -24,6 +24,8 @@ import { PromotionsPage } from './pages/PromotionsPage';
 import { MyAssessmentsPage } from './pages/MyAssessmentsPage';
 import { TakeAssessmentPage } from './pages/TakeAssessmentPage';
 import { LearningResourcesPage } from './pages/LearningResourcesPage';
+import { QuizzesPage } from './pages/QuizzesPage';
+import { QuizResultsPage } from './pages/QuizResultsPage';
 import { useTenantOrganization } from './hooks/api/useTenant';
 import { resolveOrgFeatures, type OrgFeatures } from './lib/sessionCache';
 import { OrganizationPage } from './pages/OrganizationPage';
@@ -234,10 +236,40 @@ export default function App() {
           }
         />
         <Route
+          path="quizzes"
+          element={
+            <RequireFeature feature="quizzes">
+              <QuizzesPage />
+            </RequireFeature>
+          }
+        />
+        <Route
+          path="quizzes/:quizId/results"
+          element={
+            <RequireFeature feature="quizzes">
+              <RequireHierarchy roles={['admin', 'subordinate']}>
+                <RequirePermission keys={[PERMISSIONS.ASSESSMENT_CREATE]}>
+                  <QuizResultsPage />
+                </RequirePermission>
+              </RequireHierarchy>
+            </RequireFeature>
+          }
+        />
+        <Route
+          path="quizzes/play/:assignmentId"
+          element={
+            <RequireFeature feature="quizzes">
+              <RequirePermission keys={[PERMISSIONS.ASSESSMENT_VIEW, PERMISSIONS.ASSESSMENT_SUBMIT]}>
+                <TakeAssessmentPage kind="quiz" />
+              </RequirePermission>
+            </RequireFeature>
+          }
+        />
+        <Route
           path="assessments"
           element={
             <RequireFeature feature="assessments">
-              <RequireHierarchy roles={['subordinate']}>
+              <RequireHierarchy roles={['admin', 'subordinate']}>
                 <RequirePermission keys={[PERMISSIONS.ASSESSMENT_CREATE]}>
                   <AssessmentsPage kind="assessment" />
                 </RequirePermission>
@@ -249,7 +281,7 @@ export default function App() {
           path="assessments/new"
           element={
             <RequireFeature feature="assessments">
-              <RequireHierarchy roles={['subordinate']}>
+              <RequireHierarchy roles={['admin', 'subordinate']}>
                 <RequirePermission keys={[PERMISSIONS.ASSESSMENT_CREATE]}>
                   <AssessmentBuilderPage kind="assessment" />
                 </RequirePermission>
@@ -261,7 +293,7 @@ export default function App() {
           path="assessments/:assessmentId/edit"
           element={
             <RequireFeature feature="assessments">
-              <RequireHierarchy roles={['subordinate']}>
+              <RequireHierarchy roles={['admin', 'subordinate']}>
                 <RequirePermission keys={[PERMISSIONS.ASSESSMENT_CREATE]}>
                   <AssessmentBuilderPage kind="assessment" />
                 </RequirePermission>
@@ -273,7 +305,7 @@ export default function App() {
           path="assessments/:assessmentId/results"
           element={
             <RequireFeature feature="assessments">
-              <RequireHierarchy roles={['subordinate']}>
+              <RequireHierarchy roles={['admin', 'subordinate']}>
                 <RequirePermission keys={[PERMISSIONS.ASSESSMENT_CREATE]}>
                   <AssessmentResultsPage kind="assessment" />
                 </RequirePermission>

@@ -10,6 +10,7 @@ export type OrgFeatures = {
   aiAssessmentCreate: boolean;
   worksheets: boolean;
   assessments: boolean;
+  quizzes: boolean;
   onlineExams: boolean;
 };
 
@@ -19,6 +20,7 @@ export const ALL_ORG_FEATURES: OrgFeatures = {
   aiAssessmentCreate: true,
   worksheets: true,
   assessments: true,
+  quizzes: true,
   onlineExams: true,
 };
 
@@ -35,6 +37,7 @@ export function resolveOrgFeatures(
       aiAssessmentCreate: false,
       worksheets: false,
       assessments: false,
+      quizzes: false,
       onlineExams: Boolean(org),
     };
   }
@@ -44,6 +47,7 @@ export function resolveOrgFeatures(
     aiAssessmentCreate: raw.aiAssessmentCreate === true,
     worksheets: has('worksheets') ? raw.worksheets === true : false,
     assessments: has('assessments') ? raw.assessments === true : false,
+    quizzes: has('quizzes') ? raw.quizzes === true : false,
     onlineExams: has('onlineExams') ? raw.onlineExams === true : true,
   };
 }

@@ -1,8 +1,11 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { useTenant } from '@/context/TenantContext';
 import { useAcademicYear } from '@/context/AcademicYearContext';
 import { Skeleton } from '@/components/ui/Spinner';
 import { useDashboardQuery } from '@/hooks/api/useDashboard';
+import { useTenantOrganization } from '@/hooks/api/useTenant';
+import { resolveOrgFeatures } from '@/lib/sessionCache';
 import type { OrgDashboard, StudentDashboard, TeacherDashboard } from '@/hooks/api/useDashboard';
 
 function isOrg(d: { scope: string }): d is OrgDashboard {
@@ -99,6 +102,9 @@ function Shortcut({ to, title, hint }: { to: string; title: string; hint: string
 
 export function DashboardPage() {
   const { user } = useAuth();
+  const { isMasterTenant } = useTenant();
+  const { data: org } = useTenantOrganization();
+  const features = resolveOrgFeatures(org);
   const { yearId, label, isLoading: yearsLoading, sortedYears } = useAcademicYear();
   const ready = !yearsLoading && (sortedYears.length === 0 || Boolean(yearId));
   const { data, isLoading } = useDashboardQuery(yearId || undefined, ready);
@@ -152,7 +158,12 @@ export function DashboardPage() {
       { to: '/users', title: 'Students', hint: 'Accounts and enrollment' },
       { to: '/subordinates', title: 'Teachers', hint: 'Staff you manage' },
       { to: '/classes', title: 'Classes', hint: 'Grades and sections' },
-      { to: '/academic-years', title: 'Academic years', hint: 'Open and current years' },
+      ...(features.quizzes && isMasterTenant
+        ? [{ to: '/quizzes', title: 'Quizzes', hint: 'Live quizzes, separate from assessments' }]
+        : []),
+      ...(!isMasterTenant
+        ? [{ to: '/academic-years', title: 'Academic years', hint: 'Open and current years' }]
+        : []),
     ];
   } else if (isTeacher(data)) {
     percent = data.publishedAssessments ? Math.round((data.completedAssessments / data.publishedAssessments) * 100) : 0;
@@ -174,6 +185,9 @@ export function DashboardPage() {
     shortcuts = [
       { to: '/users', title: 'My students', hint: 'Roster by class' },
       { to: '/assessments', title: 'Assessments', hint: 'Build and assign' },
+      ...(features.quizzes
+        ? [{ to: '/quizzes', title: 'Quizzes', hint: 'Launch and share a join code' }]
+        : []),
       { to: '/online-exams', title: 'Online exams', hint: 'Timed CBT sessions' },
       { to: '/group-students', title: 'Groups', hint: 'Assign by group' },
     ];
@@ -191,6 +205,9 @@ export function DashboardPage() {
     ];
     shortcuts = [
       { to: '/my-assessments', title: 'My assessments', hint: 'Open and submit' },
+      ...(features.quizzes
+        ? [{ to: '/quizzes', title: 'Quizzes', hint: 'Past quizzes and join with a code' }]
+        : []),
       { to: '/my-online-exams', title: 'Online exams', hint: 'Fullscreen CBT' },
       { to: '/profile', title: 'Profile', hint: 'Your account' },
     ];

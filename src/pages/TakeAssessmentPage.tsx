@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import clsx from 'clsx';
 import { Badge, Card, Skeleton } from '@/components/ui';
 import { AssessmentFormRunner } from '@/components/assessments/AssessmentFormRunner';
+import { QuizPlayRunner } from '@/components/quiz/QuizPlayRunner';
 import { CbtAttemptRunner } from '@/components/assessments/CbtAttemptRunner';
 import { ExamReadinessGate } from '@/components/assessments/ExamReadinessGate';
 import { useAuth } from '@/context/AuthContext';
@@ -17,7 +18,7 @@ import {
 
 export function TakeAssessmentPage({ kind = 'assessment' }: { kind?: ExamKind }) {
   const online = kind === 'online_exam';
-  const mine = online ? '/my-online-exams' : '/my-assessments';
+  const mine = online ? '/my-online-exams' : kind === 'quiz' ? '/quizzes' : '/my-assessments';
   const { assignmentId } = useParams<{ assignmentId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -28,7 +29,7 @@ export function TakeAssessmentPage({ kind = 'assessment' }: { kind?: ExamKind })
   cameraRef.current = cameraStream;
   const { data, isLoading, isError, isPlaceholderData, error: loadError, refetch } = useAssignmentQuery(
     assignmentId,
-    { preview: online && !admitted && !bypassCamera }
+    { preview: online && !admitted && !bypassCamera, pollUntilVisible: kind === 'quiz' }
   );
   const { submit } = useAssessmentMutations();
   const [error, setError] = useState<string | null>(null);
@@ -161,6 +162,17 @@ export function TakeAssessmentPage({ kind = 'assessment' }: { kind?: ExamKind })
             }
             onSubmit={handleCbtSubmit}
           />
+        ) : kind === 'quiz' ? (
+          <QuizPlayRunner
+            title={assessment.title}
+            assignmentId={assignment.id}
+            questions={assessment.questions}
+            initialRemainingSeconds={
+              assignment.remainingSeconds === undefined ? null : assignment.remainingSeconds
+            }
+            submitting={submit.isPending}
+            onSubmit={(answers, reason) => handleCbtSubmit(answers, reason || 'manual')}
+          />
         ) : (
           <AssessmentFormRunner
             title={assessment.title}
@@ -184,7 +196,7 @@ export function TakeAssessmentPage({ kind = 'assessment' }: { kind?: ExamKind })
         title={assessment.title}
         description={assessment.description}
         submittedAt={assignment.submittedAt}
-        online={online}
+        backLabel={kind === 'quiz' ? 'All quizzes' : online ? 'All online assessments' : 'All assessments'}
         onBack={() => navigate(mine)}
       />
     );
@@ -201,6 +213,7 @@ export function TakeAssessmentPage({ kind = 'assessment' }: { kind?: ExamKind })
       score={assignment.score}
       maxScore={assignment.maxScore}
       online={online}
+      backLabel={kind === 'quiz' ? 'All quizzes' : online ? 'All online assessments' : 'All assessments'}
       showAnswerKey={showAnswerKey}
       questions={assessment.questions}
       answerMap={answerMap}
@@ -280,13 +293,13 @@ function SubmissionHoldView({
   title,
   description,
   submittedAt,
-  online,
+  backLabel,
   onBack,
 }: {
   title: string;
   description?: string;
   submittedAt?: string | null;
-  online: boolean;
+  backLabel: string;
   onBack: () => void;
 }) {
   const when = formatHoldDate(submittedAt);
@@ -303,7 +316,7 @@ function SubmissionHoldView({
             className="inline-flex w-fit items-center gap-1.5 rounded-full px-1 py-1 text-sm font-medium text-slate-500 transition hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
           >
             <span aria-hidden>←</span>
-            {online ? 'All online assessments' : 'All assessments'}
+            {backLabel}
           </button>
 
           <div className="my-auto w-full rounded-[28px] bg-white px-6 py-10 text-center shadow-[0_24px_60px_-32px_rgba(15,23,42,0.35)] ring-1 ring-slate-200/80 dark:bg-slate-900 dark:ring-slate-800 sm:px-10">
@@ -328,7 +341,9 @@ function SubmissionHoldView({
             <div className="mt-6 rounded-2xl bg-slate-50 px-5 py-4 text-left dark:bg-slate-950/60">
               <p className="text-sm font-semibold text-slate-900 dark:text-white">Results on hold</p>
               <p className="mt-1.5 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
-                The academy will release them soon. You will get an email when they are ready, then open them here. Scores stay on the site, not in the email.
+                {backLabel === 'All quizzes'
+                  ? 'Your teacher will release this quiz. This page updates when they do, and your score and rank show here.'
+                  : 'The academy will release them soon. You will get an email when they are ready, then open them here. Scores stay on the site, not in the email.'}
               </p>
             </div>
           </div>
@@ -438,6 +453,7 @@ function StudentResultView({
   score,
   maxScore,
   online,
+  backLabel,
   showAnswerKey,
   questions,
   answerMap,
@@ -450,6 +466,7 @@ function StudentResultView({
   score: number | null;
   maxScore: number;
   online: boolean;
+  backLabel: string;
   showAnswerKey: boolean;
   questions: AssessmentQuestion[];
   answerMap: Map<string, { selectedOptionIds?: string[]; textAnswer?: string; isCorrect?: boolean; pointsEarned?: number }>;
@@ -499,7 +516,7 @@ function StudentResultView({
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-800/80 dark:text-emerald-200/80">
-              {online ? 'Online assessment result' : 'Assessment result'}
+              {backLabel === 'All quizzes' ? 'Quiz result' : online ? 'Online assessment result' : 'Assessment result'}
             </p>
             <h1 className="mt-2 font-display text-3xl font-bold uppercase leading-tight tracking-tight text-slate-900 dark:text-white sm:text-4xl">
               {title}
@@ -524,7 +541,7 @@ function StudentResultView({
               className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               <span aria-hidden>←</span>
-              {online ? 'All online assessments' : 'All assessments'}
+              {backLabel}
             </button>
           </div>
         </div>

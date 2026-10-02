@@ -128,6 +128,12 @@ function NavIcon({ to }: { to: string }) {
           <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
         </svg>
       );
+    case '/quizzes':
+      return (
+        <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 8l2 2 4-4" />
+        </svg>
+      );
     case '/worksheets':
       return (
         <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
@@ -193,6 +199,7 @@ export function AppLayout() {
     () => {
       const isTeacher = user?.hierarchyRole === 'subordinate';
       const isStudent = user?.hierarchyRole === 'user';
+      const isMasterAdmin = isMasterTenant && user?.hierarchyRole === 'admin';
       const teaches =
         !!user && isTeacher && can(user.permissions, PERMISSIONS.ASSESSMENT_CREATE);
       return [
@@ -274,7 +281,9 @@ export function AppLayout() {
       {
         to: '/assessments',
         label: resolveNavLabel('/assessments', user?.hierarchyRole, sidebarLabels),
-        show: features.assessments && teaches && can(user?.permissions, PERMISSIONS.ASSESSMENT_CREATE),
+        show:
+          features.assessments &&
+          (isMasterAdmin || (teaches && can(user?.permissions, PERMISSIONS.ASSESSMENT_CREATE))),
       },
       {
         to: '/my-assessments',
@@ -284,6 +293,11 @@ export function AppLayout() {
           isStudent &&
           (can(user?.permissions, PERMISSIONS.ASSESSMENT_VIEW) ||
             can(user?.permissions, PERMISSIONS.ASSESSMENT_SUBMIT)),
+      },
+      {
+        to: '/quizzes',
+        label: 'Quizzes',
+        show: features.quizzes && !!user && (isTeacher || isStudent || isMasterAdmin),
       },
       {
         to: '/online-exams',
