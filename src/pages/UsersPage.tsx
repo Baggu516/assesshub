@@ -629,6 +629,17 @@ function EditUserModal({
   );
 }
 
+function studentAccessBadge(access?: UserListRow['access']) {
+  if (!access || access.status === 'pending') return <Badge tone="neutral">Not started</Badge>;
+  if (access.status === 'active') return <Badge tone="success">Paid</Badge>;
+  if (access.status === 'trial') {
+    return <Badge tone="warning">Trial · {access.daysLeft ?? 0}d</Badge>;
+  }
+  if (access.status === 'expired') return <Badge tone="danger">Payment due</Badge>;
+  if (access.status === 'suspended') return <Badge tone="danger">Disabled</Badge>;
+  return <Badge tone="neutral">—</Badge>;
+}
+
 export function UsersPage() {
   const { user } = useAuth();
   const { data: org } = useTenantOrganization();
@@ -1039,6 +1050,7 @@ export function UsersPage() {
                   <th>Student</th>
                   {isTeacher && classTab === 'all' && <th>Classes</th>}
                   <th>Role</th>
+                  <th>Access</th>
                   <th>Status</th>
                   {!isTeacher && <th>Permissions</th>}
                   {canEditStudents && <th className="text-right">Actions</th>}
@@ -1100,6 +1112,7 @@ export function UsersPage() {
                       <td>
                         <Badge tone="info">Student</Badge>
                       </td>
+                      <td>{studentAccessBadge(u.access)}</td>
                       <td>
                         <Badge tone={u.isActive ? 'success' : 'neutral'}>
                           <span

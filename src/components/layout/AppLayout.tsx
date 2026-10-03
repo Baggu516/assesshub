@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, NavLink, Navigate, Outlet, useLocation } from 'react-router-dom';
 import clsx from 'clsx';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
@@ -89,6 +89,12 @@ function NavIcon({ to }: { to: string }) {
           />
         </svg>
       );
+    case '/subscriptions':
+      return (
+        <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+        </svg>
+      );
     case '/profile':
       return (
         <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
@@ -138,6 +144,12 @@ function NavIcon({ to }: { to: string }) {
       return (
         <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+        </svg>
+      );
+    case '/subscribe':
+      return (
+        <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
         </svg>
       );
     default:
@@ -207,6 +219,11 @@ export function AppLayout() {
       {
         to: '/clients',
         label: 'Clients',
+        show: isMasterTenant && user?.hierarchyRole === 'admin',
+      },
+      {
+        to: '/subscriptions',
+        label: 'Subscriptions',
         show: isMasterTenant && user?.hierarchyRole === 'admin',
       },
       {
@@ -313,6 +330,11 @@ export function AppLayout() {
           (can(user?.permissions, PERMISSIONS.ONLINE_EXAM_VIEW) ||
             can(user?.permissions, PERMISSIONS.ONLINE_EXAM_SUBMIT)),
       },
+      {
+        to: '/subscribe',
+        label: 'Subscription',
+        show: isStudent,
+      },
       { to: '/profile', label: resolveNavLabel('/profile', user?.hierarchyRole, sidebarLabels), show: true },
       {
         to: '/organization',
@@ -334,7 +356,15 @@ export function AppLayout() {
     [user, sidebarLabels, hasAiPlan, isMasterTenant, features]
   );
 
-  const visibleItems = useMemo(() => items.filter((i) => i.show), [items]);
+  const studentLocked = user?.hierarchyRole === 'user' && user.access?.locked === true;
+
+  const visibleItems = useMemo(() => {
+    const shown = items.filter((i) => i.show);
+    if (user?.hierarchyRole === 'user' && user.access?.locked) {
+      return shown.filter((i) => i.to === '/subscribe' || i.to === '/profile');
+    }
+    return shown;
+  }, [items, user]);
 
   const cycleTheme = () => {
     if (mode === 'light') setMode('dark');
@@ -565,10 +595,31 @@ export function AppLayout() {
 
         <main className="relative flex-1 w-full min-w-0 min-h-0 p-4 pt-16 md:pt-8 md:p-8 overflow-y-auto">
           <div className="w-full">
-            <Outlet />
+            {studentLocked && location.pathname !== '/subscribe' && location.pathname !== '/profile' ? (
+              <Navigate to="/subscribe" replace />
+            ) : (
+              <>
+                {user?.hierarchyRole === 'user' &&
+                user.access?.status === 'trial' &&
+                location.pathname !== '/subscribe' ? (
+                  <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                    <p>
+                      <span className="font-semibold">
+                        {user.access.daysLeft} day{user.access.daysLeft === 1 ? '' : 's'}
+                      </span>{' '}
+                      left in your free trial.
+                    </p>
+                    <Link to="/subscribe" className="font-semibold underline underline-offset-2">
+                      Subscribe
+                    </Link>
+                  </div>
+                ) : null}
+                <Outlet />
+              </>
+            )}
           </div>
         </main>
-        {hasAiPlan && location.pathname === '/' ? <AiChatWidget /> : null}
+        {hasAiPlan && location.pathname === '/' && !studentLocked ? <AiChatWidget /> : null}
       </div>
     </div>
   );

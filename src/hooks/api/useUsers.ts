@@ -13,6 +13,11 @@ export interface UserListRow {
   parentUserId?: string | null;
   /** Present for teachers — classes they share with this student */
   classes?: { id: string; name: string; academicYear?: string }[];
+  access?: {
+    status: 'trial' | 'active' | 'expired' | 'pending' | 'exempt' | 'suspended' | 'waived';
+    daysLeft: number | null;
+    locked: boolean;
+  };
 }
 
 /** Cannot be granted to org line members by a lead (must match backend `ORG_LEVEL_PERMISSION_KEYS`). */

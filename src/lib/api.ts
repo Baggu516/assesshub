@@ -15,13 +15,17 @@ export const api = axios.create({
 
 let getSubdomain: () => string | null = () => null;
 let onAuthFailure: (() => void) | null = null;
+let onSubscriptionRequired: (() => void) | null = null;
+let subscriptionRefresh: Promise<void> | null = null;
 
 export function configureApiHooks(opts: {
   getSubdomain: () => string | null;
   onAuthFailure?: () => void;
+  onSubscriptionRequired?: () => void;
 }) {
   getSubdomain = opts.getSubdomain;
   onAuthFailure = opts.onAuthFailure ?? null;
+  onSubscriptionRequired = opts.onSubscriptionRequired ?? null;
 }
 
 export function getStoredAccessToken() {
@@ -77,6 +81,14 @@ api.interceptors.response.use(
         }
       } else {
         onAuthFailure?.();
+      }
+    }
+    const code = (error.response?.data as { code?: string } | undefined)?.code;
+    if (error.response?.status === 402 && code === 'SUBSCRIPTION_REQUIRED' && onSubscriptionRequired) {
+      if (!subscriptionRefresh) {
+        subscriptionRefresh = Promise.resolve(onSubscriptionRequired()).finally(() => {
+          subscriptionRefresh = null;
+        });
       }
     }
     throw error;

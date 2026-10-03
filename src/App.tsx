@@ -22,6 +22,7 @@ import { AcademicYearsPage } from './pages/AcademicYearsPage';
 import { ClassMastersPage } from './pages/ClassMastersPage';
 import { PromotionsPage } from './pages/PromotionsPage';
 import { MyAssessmentsPage } from './pages/MyAssessmentsPage';
+import { SubscribePage } from './pages/SubscribePage';
 import { TakeAssessmentPage } from './pages/TakeAssessmentPage';
 import { LearningResourcesPage } from './pages/LearningResourcesPage';
 import { QuizzesPage } from './pages/QuizzesPage';
@@ -30,6 +31,7 @@ import { useTenantOrganization } from './hooks/api/useTenant';
 import { resolveOrgFeatures, type OrgFeatures } from './lib/sessionCache';
 import { OrganizationPage } from './pages/OrganizationPage';
 import { ClientsPage } from './pages/ClientsPage';
+import { SubscriptionStudentsPage, SubscriptionsPage } from './pages/SubscriptionsPage';
 import { AppLayout } from './components/layout/AppLayout';
 import { FullPageSpinner } from './components/ui/Spinner';
 import { useTenant } from './context/TenantContext';
@@ -102,6 +104,22 @@ export default function App() {
           }
         />
         <Route
+          path="subscriptions"
+          element={
+            <RequireMaster>
+              <SubscriptionsPage />
+            </RequireMaster>
+          }
+        />
+        <Route
+          path="subscriptions/:orgId"
+          element={
+            <RequireMaster>
+              <SubscriptionStudentsPage />
+            </RequireMaster>
+          }
+        />
+        <Route
           path="users"
           element={
             <RequireHierarchy roles={['admin', 'subordinate']}>
@@ -120,6 +138,7 @@ export default function App() {
           }
         />
         <Route path="profile" element={<ProfilePage />} />
+        <Route path="subscribe" element={<SubscribePage />} />
         <Route
           path="organization"
           element={

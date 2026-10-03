@@ -67,8 +67,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         clearTokens();
         navigate('/login', { replace: true });
       },
+      onSubscriptionRequired: () => {
+        refreshSession().catch(() => {});
+      },
     });
-  }, [subdomain, navigate]);
+  }, [subdomain, navigate, refreshSession]);
 
   useEffect(() => {
     let cancelled = false;
